@@ -12,6 +12,7 @@ import (
 )
 
 var (
+	ErrMissingConfig     = errors.New("missing config")
 	ErrTableCreateFailed = errors.New("failed to create table")
 )
 
@@ -22,6 +23,10 @@ type Postgres struct {
 
 func Init(ctx context.Context, config *pgxpool.Config) (*Postgres, error) {
 	// urlExample := "postgres://username:password@localhost:5432/database_name"
+	if config == nil {
+		return nil, ErrMissingConfig
+	}
+
 	pool, err := pgxpool.NewWithConfig(context.Background(), config)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to connect to database: %v\n", err)
@@ -114,6 +119,12 @@ func (p *Postgres) Execute(table string) error {
 	if err != nil {
 		return fmt.Errorf("failed executing: %w", err)
 	}
+
+	err = tx.Commit(p.Ctx)
+	if err != nil {
+		return fmt.Errorf("failed commiting: %w", err)
+	}
+
 	return nil
 }
 
