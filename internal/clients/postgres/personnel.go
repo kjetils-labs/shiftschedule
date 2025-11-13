@@ -12,3 +12,70 @@ func mapRowToPersonnel(rows pgx.Rows) (*models.Personnel, error) {
 	}
 	return &p, nil
 }
+
+// GetPersonnel gets current existing personnel.
+func (p *Postgres) GetPersonnel() ([]*models.Personnel, error) {
+	query := `
+		SELECT p.id, p.name
+		FROM personnel p
+		GROUP BY p.id, p.name
+		ORDER BY p.id;
+	`
+
+	return Query(p, query, mapRowToPersonnel)
+}
+
+// GetPersonnel gets current existing personnel.
+func (p *Postgres) GetPersonnelByName(personnelName string) ([]*models.Personnel, error) {
+	query := `
+		SELECT p.id, p.name
+		FROM personnel p
+		WHERE p.name = $1
+		GROUP BY p.id, p.name
+		ORDER BY p.id;
+	`
+
+	return Query(p, query, mapRowToPersonnel, personnelName)
+}
+
+// GetPersonnelSchedule gets the personnel's assigned schedules.
+func (p *Postgres) GetPersonnelSchedule(personnelName string) ([]*models.ShiftSchedule, error) {
+	query := `
+		SELECT 
+			s.id,
+			s.name,
+			s.weeknumber,
+			s.assignee,
+			s.substitute,
+			s.comment,
+			s.accepted
+		FROM shiftschedule s
+		JOIN schedule_personnel sp ON s.id = sp.schedule_id
+		JOIN personnel p ON sp.personnel_id = p.id
+		WHERE p.name = $1
+		ORDER BY s.weeknumber;
+	`
+
+	return Query(p, query, mapRowToShiftSchedule, personnelName)
+}
+
+// NewPersonnel creates a person.
+func (p *Postgres) NewPersonnel(personnelName string) ([]*models.ShiftSchedule, error) {
+	query := `
+		SELECT 
+			s.id,
+			s.name,
+			s.weeknumber,
+			s.assignee,
+			s.substitute,
+			s.comment,
+			s.accepted
+		FROM shiftschedule s
+		JOIN schedule_personnel sp ON s.id = sp.schedule_id
+		JOIN personnel p ON sp.personnel_id = p.id
+		WHERE p.name = $1
+		ORDER BY s.weeknumber;
+	`
+
+	return Query(p, query, mapRowToShiftSchedule, personnelName)
+}
