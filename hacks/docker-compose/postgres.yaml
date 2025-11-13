@@ -1,0 +1,16 @@
+db:
+  image: postgres:alpine
+  container_name: postgres
+  ports:
+    - "5432:5432"
+  environment:
+    POSTGRES_USER: user
+    POSTGRES_PASSWORD: password123
+    POSTGRES_DB:
+      shiftschedule
+      # - POSTGRES_USER=${DB_USER}
+      # - POSTGRES_PASSWORD=${DB_PASSWORD}
+      # - POSTGRES_DB=${DB_NAME}
+  volumes:
+    - ../data/pgdata:/var/lib/postgresql/data
+  restart: unless-stopped
