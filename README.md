@@ -12,3 +12,4 @@ I don't have any frontend or fullstack experience, only backend development, so 
 
 Relations diagram
 Docs
+Dex for auth
