@@ -9,49 +9,58 @@ import (
 
 func InitTestData(ctx context.Context, pg *postgres.Postgres) error {
 
-	err := pg.CreateTables()
-	if err != nil {
-		return fmt.Errorf("creating table: %w", err)
+	if err := pg.CreateTables(); err != nil {
+		return fmt.Errorf("creating tables: %w", err)
 	}
 
-	err = pg.Execute(`
+	if err := pg.Execute(`
 		INSERT INTO personnel (name)
-		VALUES ('Alice'), ('Bob'), ('Charlie'), ('Diana'), ('Ethan'), ('Fiona');
-    `)
-	if err != nil {
-		return fmt.Errorf("inserting data: %w", err)
+		VALUES 
+			('Alice'),
+			('Bob'),
+			('Charlie'),
+			('Diana'),
+			('Ethan'),
+			('Fiona');
+	`); err != nil {
+		return fmt.Errorf("inserting personnel: %w", err)
+	}
+
+	if err := pg.Execute(`
+		INSERT INTO schedule_type (name, description)
+		VALUES
+			('Primary TRD', 'Main Trondheim schedule'),
+			('Primary OSL', 'Main Oslo schedule');
+	`); err != nil {
+		return fmt.Errorf("inserting schedule types: %w", err)
+	}
+
+	if err := pg.Execute(`
+		INSERT INTO schedule_type_personnel (schedule_type_id, personnel_id)
+		VALUES
+			(1, 1), (1, 2), (1, 3),  -- Alice, Bob, Charlie eligible for Primary TRD
+			(2, 4), (2, 5), (2, 6),  -- Diana, Ethan, Fiona eligible for Primary OSL
+			(1, 4);                  -- Diana also eligible for Primary TRD
+	`); err != nil {
+		return fmt.Errorf("inserting schedule type-personnel links: %w", err)
+	}
+
+	if err := pg.Execute(`
+		INSERT INTO shiftschedule (name, weeknumber, accepted, schedule_type_id)
+		VALUES
+			('Primary TRD - Week 1', 1, FALSE, 1),
+			('Primary OSL - Week 1', 1, FALSE, 2);
+	`); err != nil {
+		return fmt.Errorf("inserting shift schedules: %w", err)
 	}
 
 	personnel, err := pg.GetPersonnel()
 	if err != nil {
-		return fmt.Errorf("failed to get personne: %w", err)
+		return fmt.Errorf("fetching personnel: %w", err)
 	}
 
 	for _, person := range personnel {
-		if person == nil {
-			return fmt.Errorf("person is nil")
-		}
-		fmt.Println(person)
-	}
-
-	err = pg.Execute(`
-		INSERT INTO shiftschedule (name, weeknumber, accepted)
-		VALUES ('Primary TRD', 1, FALSE),
-			   ('Primary OSL', 1, FALSE);
-    `)
-	if err != nil {
-		return fmt.Errorf("inserting data: %w", err)
-	}
-
-	err = pg.Execute(`
-		INSERT INTO schedule_personnel (schedule_id, personnel_id)
-		VALUES 
-		  (1, 1), (1, 2), (1, 3),  -- Alice, Bob, Charlie on Primary TRD
-		  (2, 4), (2, 5), (2, 6),  -- Diana, Ethan, Fiona on Backup OSL
-		  (1, 4);                  -- Diana is also allowed on Primary TRD
-    `)
-	if err != nil {
-		return fmt.Errorf("inserting data: %w", err)
+		fmt.Printf("Loaded personnel: %+v\n", person)
 	}
 
 	return nil
