@@ -79,3 +79,28 @@ func (p *Postgres) NewPersonnel(personnelName string) ([]*models.ShiftSchedule, 
 
 	return Query(p, query, mapRowToShiftSchedule, personnelName)
 }
+
+// UpdatePersonnel creates a person.
+func (p *Postgres) UpdatePersonnel(personnelName, newPersonnelName string) ([]*models.ShiftSchedule, error) {
+	query := `
+	UPDATE shiftschedule
+	WHERE p.name = $1
+	SET p.name = $2
+	`
+
+	return Query(p, query, mapRowToShiftSchedule, personnelName, newPersonnelName)
+}
+
+// UpdatePersonnel creates a person.
+func (p *Postgres) DeletePersonnel(personnelName string) error {
+	query := `
+		DELETE 
+		FROM shiftschedule
+		WHERE p.name = $1
+		
+	`
+
+	_, err := Query(p, query, mapRowToShiftSchedule, personnelName)
+
+	return err
+}

@@ -4,21 +4,33 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/shiftschedule/internal/clients/postgres"
+	"github.com/shiftschedule/internal/config"
 	"github.com/shiftschedule/test"
 )
 
 func main() {
 
-	url := "postgres://user:Password123@localhost:5432/shiftschedule"
-	ctx := context.Background()
-	config, err := pgxpool.ParseConfig(url)
-	config.ConnConfig.TLSConfig = nil
+	enableTLS := false
+	config, err := config.Init()
 	if err != nil {
-		panic(fmt.Errorf("failed to parse config from url %v. %w", url, err))
+		panic(err)
 	}
-	pg, err := postgres.Init(ctx, config)
+
+	pgConfig, err := postgres.NewPostgresConfig(
+		config.PostgresUsername,
+		config.PostgresPassword,
+		config.PostgresHostname,
+		config.PostgresPort,
+		config.PostgresDatabase,
+		enableTLS,
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	ctx := context.Background()
+	pg, err := postgres.Init(ctx, pgConfig)
 	if err != nil {
 		panic(fmt.Errorf("failed to start postgres init. %w", err))
 	}

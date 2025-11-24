@@ -15,13 +15,26 @@ var (
 	ErrTableCreateFailed = errors.New("failed to create table")
 )
 
+func NewPostgresConfig(username, password, hostname string, port int, database string, tls bool) (*pgxpool.Config, error) {
+
+	// urlExample := "postgres://username:password@localhost:5432/database_name"
+	url := fmt.Sprintf("postgres://%v:%v@%v:%d/%v", username, password, hostname, port, database)
+	config, err := pgxpool.ParseConfig(url)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse config from url %v. %w", url, err)
+	}
+	if !tls {
+		config.ConnConfig.TLSConfig = nil
+	}
+	return config, nil
+}
+
 type Postgres struct {
 	Ctx  context.Context
 	Pool *pgxpool.Pool
 }
 
 func Init(ctx context.Context, config *pgxpool.Config) (*Postgres, error) {
-	// urlExample := "postgres://username:password@localhost:5432/database_name"
 	if config == nil {
 		return nil, ErrMissingConfig
 	}
