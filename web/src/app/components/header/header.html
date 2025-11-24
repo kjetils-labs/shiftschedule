@@ -1,3 +1,22 @@
-<header>
-  <nav>ShiftSchedule</nav>
+<header class="navbar">
+  <div class="logo">
+    <h1>{{ companyName }}</h1>
+    <!-- You can replace this with your actual app name or logo -->
+  </div>
+  <nav class="nav-links">
+    <ul>
+      <li><a routerLink="/home" routerLinkActive="active">Home</a></li>
+      <li>
+        <a routerLink="/schedules/mine" routerLinkActive="active"
+          >My Schedules</a
+        >
+      </li>
+      <li>
+        <a routerLink="/schedules/all" routerLinkActive="active"
+          >All Schedules</a
+        >
+      </li>
+      <li><a routerLink="/admin" routerLinkActive="active">Admin</a></li>
+    </ul>
+  </nav>
 </header>

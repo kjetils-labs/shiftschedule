@@ -1,0 +1,49 @@
+<div class="home-container">
+  <!-- Left content (tables) -->
+  <div class="left-content">
+    <div class="current-week-container">
+      <label for="current-week">Current Week:</label>
+      <input
+        id="current-week"
+        type="number"
+        [(ngModel)]="currentWeek"
+        min="1"
+        max="52"
+        placeholder="Enter current week"
+      />
+    </div>
+
+    <div *ngFor="let table of tables" class="table-container">
+      <h3>{{ table.tableName }}</h3>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Week Number</th>
+            <th>Assignee</th>
+            <th>Substitute</th>
+            <th>Accepted</th>
+            <th>Comment</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            *ngFor="let row of table.data"
+            [ngClass]="{ 'highlight-row': row.weekNumber === currentWeek }"
+          >
+            <td>{{ row.weekNumber }}</td>
+            <td>{{ row.assignee }}</td>
+            <td>{{ row.substitute }}</td>
+            <td>{{ row.accepted }}</td>
+            <td>{{ row.comment }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Right content (for future use) -->
+  <div class="right-content">
+    <!-- Placeholder for future content (stats, charts, etc.) -->
+    <p>Future content goes here.</p>
+  </div>
+</div>

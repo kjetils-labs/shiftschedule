@@ -1,15 +1,26 @@
 import { Component } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
-import { Components } from './components/components';
+import { RouterModule, RouterOutlet } from '@angular/router';
+import { HomeComponent } from './home/home.component';
+import { MySchedulesComponent } from './my-schedules/my-schedules.component';
+import { AdminComponent } from './admin/admin.component';
 import { Header } from './components/header/header';
-import { Home } from './home/home';
+import { FormsModule } from '@angular/forms';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, Components, Header, Home],
+  standalone: true,
+  imports: [
+    RouterModule,
+    RouterOutlet,
+    Header,
+    HomeComponent,
+    MySchedulesComponent,
+    AdminComponent,
+    FormsModule,
+  ],
   templateUrl: './app.component.html',
-  styleUrl: './app.component.scss',
+  styleUrls: ['./app.component.scss'],
 })
 export class AppComponent {
-  title = 'shiftschedule';
+  title = 'Shift Schedule';
 }
