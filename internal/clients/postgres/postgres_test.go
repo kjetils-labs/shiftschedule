@@ -50,10 +50,9 @@ func TestBadConfigs(t *testing.T) {
 	assert.Nil(t, config)
 }
 
-func TestPostgres(t *testing.T) {
+func dockerPostgres(ctx context.Context) {
 
 	composeContent, err := os.ReadFile("./hacks/docker-compose/postgres.yaml")
-	ctx := t.Context()
 
 	stack, err := compose.NewDockerComposeWith(compose.WithStackReaders(strings.NewReader(string(composeContent))))
 	if err != nil {

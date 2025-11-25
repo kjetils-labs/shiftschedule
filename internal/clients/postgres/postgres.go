@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/rs/zerolog"
 )
 
 var (
@@ -35,19 +35,28 @@ type Postgres struct {
 }
 
 func Init(ctx context.Context, config *pgxpool.Config) (*Postgres, error) {
+
+	logger := zerolog.Ctx(ctx)
+
 	if config == nil {
 		return nil, ErrMissingConfig
 	}
 
 	pool, err := pgxpool.NewWithConfig(context.Background(), config)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to connect to database: %v\n", err)
-		return nil, err
+		return nil, fmt.Errorf("unable to connect to database: %w", err)
 	}
 	pg := Postgres{
 		Ctx:  ctx,
 		Pool: pool,
 	}
+	logger.Info().Msg("connected to postgres")
+
+	err = pg.CreateTables()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create tables: %w", err)
+	}
+	logger.Info().Msg("verified tables exist")
 
 	return &pg, nil
 }
@@ -60,7 +69,7 @@ func Query[T any](p *Postgres, query string, rowMapper func(pgx.Rows) (T, error)
 	}
 	defer rows.Close()
 
-	var results []T
+	results := []T{}
 	for rows.Next() {
 		item, err := rowMapper(rows)
 		if err != nil {
@@ -76,7 +85,7 @@ func Query[T any](p *Postgres, query string, rowMapper func(pgx.Rows) (T, error)
 	return results, nil
 }
 
-func (p *Postgres) Execute(table string) error {
+func (p *Postgres) Execute(table string, args ...any) error {
 
 	tx, err := p.Pool.Begin(p.Ctx)
 	if err != nil {
@@ -84,7 +93,7 @@ func (p *Postgres) Execute(table string) error {
 	}
 	defer tx.Rollback(p.Ctx)
 
-	_, err = tx.Exec(p.Ctx, table)
+	_, err = tx.Exec(p.Ctx, table, args...)
 	if err != nil {
 		return fmt.Errorf("failed executing: %w", err)
 	}

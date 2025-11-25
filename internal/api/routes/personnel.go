@@ -34,7 +34,7 @@ func NewPersonnel(pg *postgres.Postgres) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		var input struct {
-			Name string `json:"name" binding:"required"`
+			Names []string `json:"names" binding:"required"`
 		}
 
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -42,7 +42,7 @@ func NewPersonnel(pg *postgres.Postgres) gin.HandlerFunc {
 			return
 		}
 
-		_, err := pg.Pool.Exec(pg.Ctx, "INSERT INTO personnel (name) VALUES ($1)", input.Name)
+		err := pg.NewPersonnel(input.Names)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return

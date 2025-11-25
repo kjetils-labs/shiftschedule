@@ -1,7 +1,10 @@
 package postgres
 
 import (
+	"fmt"
+
 	"github.com/jackc/pgx/v5"
+	"github.com/rs/zerolog"
 	"github.com/shiftschedule/internal/models"
 )
 
@@ -60,24 +63,30 @@ func (p *Postgres) GetPersonnelSchedule(personnelName string) ([]*models.ShiftSc
 }
 
 // NewPersonnel creates a person.
-func (p *Postgres) NewPersonnel(personnelName string) ([]*models.ShiftSchedule, error) {
+func (p *Postgres) NewPersonnel(personnelNames []string) error {
+	logger := zerolog.Ctx(p.Ctx)
 	query := `
-		SELECT 
-			s.id,
-			s.name,
-			s.weeknumber,
-			s.assignee,
-			s.substitute,
-			s.comment,
-			s.accepted
-		FROM shiftschedule s
-		JOIN schedule_personnel sp ON s.id = sp.schedule_id
-		JOIN personnel p ON sp.personnel_id = p.id
-		WHERE p.name = $1
-		ORDER BY s.weeknumber;
+		INSERT INTO personnel (name)
+		VALUES 
 	`
+	args := make([]any, 0, len(personnelNames))
+	for i, name := range personnelNames {
+		placeholder := fmt.Sprintf("$%d", i+1)
+		if i > 0 {
+			query += ", "
+		}
+		query += "(" + placeholder + ")"
+		args = append(args, name)
+	}
 
-	return Query(p, query, mapRowToShiftSchedule, personnelName)
+	logger.Debug().Ctx(p.Ctx).Int("args_count", len(args)).Str("query", query).Send()
+
+	err := p.Execute(query, args...)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // UpdatePersonnel creates a person.
@@ -87,17 +96,14 @@ func (p *Postgres) UpdatePersonnel(personnelName, newPersonnelName string) ([]*m
 	WHERE p.name = $1
 	SET p.name = $2
 	`
-
 	return Query(p, query, mapRowToShiftSchedule, personnelName, newPersonnelName)
 }
 
 // UpdatePersonnel creates a person.
 func (p *Postgres) DeletePersonnel(personnelName string) error {
 	query := `
-		DELETE 
-		FROM shiftschedule
+		DELETE FROM shiftschedule
 		WHERE p.name = $1
-		
 	`
 
 	_, err := Query(p, query, mapRowToShiftSchedule, personnelName)

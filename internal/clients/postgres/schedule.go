@@ -24,7 +24,24 @@ func mapRowToShiftSchedule(rows pgx.Rows) (*models.ShiftSchedule, error) {
 }
 
 // GetSchedules gets all schedules in the db.
-func (p *Postgres) GetSchedules() {
+func (p *Postgres) GetSchedules() ([]*models.ShiftSchedule, error) {
+	query := `
+		SELECT 
+			s.id,
+			s.name,
+			s.weeknumber,
+			s.assignee,
+			s.substitute,
+			s.comment,
+			s.accepted
+		FROM shiftschedule s
+	`
+	schedules, err := Query(p, query, mapRowToShiftSchedule)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query db. %w", err)
+	}
+
+	return schedules, nil
 }
 
 // GetSchedulePersonnel gets all personnel assigned a specific schedule.
