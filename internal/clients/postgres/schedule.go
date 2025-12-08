@@ -44,6 +44,28 @@ func (p *Postgres) GetSchedules() ([]*models.ShiftSchedule, error) {
 	return schedules, nil
 }
 
+// GetSchedule get the schedule with name from the db.
+func (p *Postgres) GetSchedule(name string) ([]*models.ShiftSchedule, error) {
+	query := `
+		SELECT 
+			s.id,
+			s.name,
+			s.weeknumber,
+			s.assignee,
+			s.substitute,
+			s.comment,
+			s.accepted
+		FROM shiftschedule s
+		WHERE s.name = $1
+	`
+	schedules, err := Query(p, query, mapRowToShiftSchedule, name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query db. %w", err)
+	}
+
+	return schedules, nil
+}
+
 // GetSchedulePersonnel gets all personnel assigned a specific schedule.
 func (p *Postgres) GetSchedulePersonnel(scheduleName string) (*models.ScheduleTypePersonnel, error) {
 	query := `
