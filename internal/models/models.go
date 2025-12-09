@@ -1,6 +1,14 @@
 package models
 
 // Personnel represents an individual that can be assigned to a shift.
+
+// CREATE TABLE personnel (
+//
+//	id SERIAL PRIMARY KEY,
+//	name TEXT NOT NULL
+//
+// ):
+// .
 type Personnel struct {
 	ID   int    `json:"id" db:"id"`
 	Name string `json:"name" db:"name"`
@@ -26,6 +34,19 @@ type ScheduleTypePersonnel struct {
 }
 
 // ShiftSchedule represents a concrete schedule instance (e.g., a specific week).
+// CREATE TABLE shiftschedule (
+//
+//	id SERIAL PRIMARY KEY,
+//	schedule_type_id INT REFERENCES schedule_type(id)
+//	name TEXT NOT NULL,
+//	weeknumber INTEGER NOT NULL,
+//	assignee INTEGER REFERENCES personnel(id),
+//	substitute INTEGER REFERENCES personnel(id),
+//	comment TEXT,
+//	accepted BOOLEAN DEFAULT FALSE
+//
+// );
+// .
 type ShiftSchedule struct {
 	ID             int     `json:"id" db:"id"`
 	Name           string  `json:"name" db:"name"`
