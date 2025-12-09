@@ -3,25 +3,8 @@ package postgres
 import (
 	"fmt"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/shiftschedule/internal/models"
 )
-
-func mapRowToShiftSchedule(rows pgx.Rows) (*models.ShiftSchedule, error) {
-	var s models.ShiftSchedule
-	if err := rows.Scan(
-		&s.ID,
-		&s.Name,
-		&s.WeekNumber,
-		&s.Assignee,
-		&s.Substitute,
-		&s.Comment,
-		&s.Accepted,
-	); err != nil {
-		return &models.ShiftSchedule{}, err
-	}
-	return &s, nil
-}
 
 // GetSchedules gets all schedules in the db.
 func (p *Postgres) GetSchedules() ([]*models.ShiftSchedule, error) {
@@ -64,6 +47,45 @@ func (p *Postgres) GetSchedule(name string) ([]*models.ShiftSchedule, error) {
 	}
 
 	return schedules, nil
+}
+
+// NewSchedule creates a new schedule.
+func (p *Postgres) NewSchedule(name string, weeknumber int, assignee *int, substitute *int, comment string, scheduleTypeID int) error {
+	query := `
+		INSERT INTO shfitschedule (name, weeknumber, assignee, substitute, comment, schedule_type_id accepted)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+	`
+
+	args := []any{name, weeknumber, assignee, substitute, comment, scheduleTypeID, false}
+
+	err := p.Execute(query, args...)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// UpdateSchedule updates a schedule.
+func (p *Postgres) UpdateSchedule(personnelName, newPersonnelName string) ([]*models.ShiftSchedule, error) {
+	query := `
+	UPDATE shiftschedule s
+	WHERE s.name = $1
+	SET p.name = $2
+	`
+	return Query(p, query, mapRowToShiftSchedule, personnelName, newPersonnelName)
+}
+
+// DeleteSchedule deletes a schedule.
+func (p *Postgres) DeleteSchedule(personnelName string) error {
+	query := `
+		DELETE FROM shiftschedule p
+		WHERE p.name = $1
+	`
+
+	_, err := Query(p, query, mapRowToShiftSchedule, personnelName)
+
+	return err
 }
 
 // GetSchedulePersonnel gets all personnel assigned a specific schedule.

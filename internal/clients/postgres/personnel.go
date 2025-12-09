@@ -3,18 +3,9 @@ package postgres
 import (
 	"fmt"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/rs/zerolog"
 	"github.com/shiftschedule/internal/models"
 )
-
-func mapRowToPersonnel(rows pgx.Rows) (*models.Personnel, error) {
-	var p models.Personnel
-	if err := rows.Scan(&p.ID, &p.Name); err != nil {
-		return &models.Personnel{}, err
-	}
-	return &p, nil
-}
 
 // GetPersonnel gets current existing personnel.
 func (p *Postgres) GetPersonnel() ([]*models.Personnel, error) {
@@ -89,20 +80,20 @@ func (p *Postgres) NewPersonnel(personnelNames []string) error {
 	return nil
 }
 
-// UpdatePersonnel creates a person.
+// UpdatePersonnel updates a person.
 func (p *Postgres) UpdatePersonnel(personnelName, newPersonnelName string) ([]*models.ShiftSchedule, error) {
 	query := `
-	UPDATE shiftschedule
+	UPDATE personnel p
 	WHERE p.name = $1
 	SET p.name = $2
 	`
 	return Query(p, query, mapRowToShiftSchedule, personnelName, newPersonnelName)
 }
 
-// UpdatePersonnel creates a person.
+// DeletePersonnel deletes a person.
 func (p *Postgres) DeletePersonnel(personnelName string) error {
 	query := `
-		DELETE FROM shiftschedule
+		DELETE FROM personnel
 		WHERE p.name = $1
 	`
 
