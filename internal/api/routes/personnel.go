@@ -1,65 +1,92 @@
 package routes
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
 
-	"github.com/gin-gonic/gin"
+	"github.com/go-chi/chi/v5"
 	"github.com/shiftschedule/internal/clients/postgres"
 )
 
-func GetPersonnelAll(pg *postgres.Postgres) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		personnel, err := pg.GetPersonnel()
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-		c.JSON(http.StatusOK, personnel)
-
-	}
+type PersonnelHandler struct {
+	pg *postgres.Postgres
 }
 
-func GetPersonnelByName(pg *postgres.Postgres) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		personnel, err := pg.GetPersonnelByName(c.Query("name"))
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-		c.JSON(http.StatusOK, personnel)
+func (p *PersonnelHandler) GetPersonnelAll(w http.ResponseWriter, r *http.Request) error {
+	personnel, err := p.pg.GetPersonnel()
+	if err != nil {
+		return err
 	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	err = json.NewEncoder(w).Encode(personnel)
+	if err != nil {
+		writeJSONError(w, "failed to encode response", http.StatusInternalServerError)
+		w.WriteHeader(http.StatusInternalServerError)
+		return err
+	}
+
+	return nil
 }
 
-func NewPersonnel(pg *postgres.Postgres) gin.HandlerFunc {
-	return func(c *gin.Context) {
-
-		var input struct {
-			Names []string `json:"names" binding:"required"`
-		}
-
-		if err := c.ShouldBindJSON(&input); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-
-		err := pg.NewPersonnel(input.Names)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-
-		c.JSON(http.StatusCreated, gin.H{"message": "personnel created"})
+func (p *PersonnelHandler) GetPersonnelByName(w http.ResponseWriter, r *http.Request) error {
+	personnel, err := p.pg.GetPersonnelByName(chi.URLParam(r, "name"))
+	if err != nil {
+		return err
 	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	err = json.NewEncoder(w).Encode(personnel)
+	if err != nil {
+		writeJSONError(w, "failed to encode response", http.StatusInternalServerError)
+		w.WriteHeader(http.StatusInternalServerError)
+		return err
+	}
+
+	return nil
 }
 
-func UpdatePersonnel(pg *postgres.Postgres) gin.HandlerFunc {
-	return func(c *gin.Context) {
+func (p *PersonnelHandler) NewPersonnel(w http.ResponseWriter, r *http.Request) error {
+
+	var input struct {
+		Names []string `json:"names" binding:"required"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		writeJSONError(w, "failed to bind input", http.StatusBadRequest)
+		w.WriteHeader(http.StatusBadRequest)
+		return err
+	}
+
+	if len(input.Names) == 0 {
 
 	}
+	for i, name := range input.Names {
+		if name == "" {
+			writeJSONError(w, fmt.Sprintf("input name entry indexed %d is empty", i), http.StatusBadRequest)
+			return fmt.Errorf("input name entry indexed %d is empty", i)
+		}
+	}
+
+	err := p.pg.NewPersonnel(input.Names)
+	if err != nil {
+		writeJSONError(w, "failed to update database", http.StatusInternalServerError)
+		return err
+	}
+
+	w.WriteHeader(http.StatusCreated)
+
+	return nil
 }
 
-func DeletePersonnel(pg *postgres.Postgres) gin.HandlerFunc {
-	return func(c *gin.Context) {
+func (p *PersonnelHandler) UpdatePersonnel(w http.ResponseWriter, r *http.Request) error {
+	return nil
+}
 
-	}
+func (p *PersonnelHandler) DeletePersonnel(w http.ResponseWriter, r *http.Request) error {
+	return nil
 }

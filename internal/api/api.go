@@ -8,7 +8,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gin-gonic/gin"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/rs/zerolog"
 	"github.com/shiftschedule/internal/api/routes"
 	"github.com/shiftschedule/internal/clients/postgres"
@@ -46,28 +47,59 @@ func StartListening(ctx context.Context, pg *postgres.Postgres, address string) 
 
 func InitHttpServer(ctx context.Context, pg *postgres.Postgres, address string) (*http.Server, error) {
 
-	router := gin.Default()
-	setupRoutes(router, pg)
+	r := chi.NewRouter()
+	r.Use(middleware.RequestID)
+	r.Use(middleware.RealIP)
+	r.Use(middleware.Logger)
+	r.Use(middleware.Recoverer)
+
+	setupRoutes(r)
 	srv := &http.Server{
-		Handler: router,
+		Handler: r,
 		Addr:    address,
 	}
 
 	return srv, nil
 }
 
-func setupRoutes(router *gin.Engine, pg *postgres.Postgres) error {
-	v1 := router.Group("/v1")
+func setupRoutes(router *chi.Mux) error {
 
-	healthcheck := v1.Group("/healthcheck")
-	healthcheck.GET("/ping", routes.Ping())
-
-	personnel := v1.Group("/personnel")
-	personnel.GET("", routes.GetPersonnelAll(pg))
-	personnel.GET("/:personnelName", routes.GetPersonnelByName(pg))
-	personnel.POST("", routes.NewPersonnel(pg))
-	personnel.PUT("/:personelKey", routes.UpdatePersonnel(pg))
-	personnel.DELETE("/:personelKey", routes.DeletePersonnel(pg))
+	router.Mount("/v1", setupV1Routes())
+	//
+	// healthcheck := v1.Group("/healthcheck")
+	// healthcheck.GET("/ping", routes.Ping())
+	//
+	// personnel := v1.Group("/personnel")
+	// personnel.GET("", routes.GetPersonnelAll(pg))
+	// personnel.GET("/:personnelName", routes.GetPersonnelByName(pg))
+	// personnel.POST("", routes.NewPersonnel(pg))
+	// personnel.PUT("/:personelKey", routes.UpdatePersonnel(pg))
+	// personnel.DELETE("/:personelKey", routes.DeletePersonnel(pg))
 
 	return nil
+}
+
+func setupV1Routes() chi.Router {
+	r := chi.NewRouter()
+
+	r.Route("/v1", setupPersonnel)
+	r.Route("/v1", setupSchedule)
+	r.Route("/v1", setupScheduleType)
+
+	return r
+}
+
+func setupPersonnel(r chi.Router) {
+	personnel := routes.PersonnelHandler{}
+	r.Get("/personnel", wrap(personnel.GetPersonnelAll))
+}
+
+func setupSchedule(r chi.Router) {
+	schedule := routes.ScheduleHandler{}
+	r.Get("/schedule", wrap(schedule.GetScheduleAll))
+}
+
+func setupScheduleType(r chi.Router) {
+	scheduleType := routes.ScheduleTypeHandler{}
+	r.Get("/scheduletype", wrap(scheduleType.GetScheduleTypeAll))
 }

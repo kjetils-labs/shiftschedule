@@ -1,9 +1,10 @@
 module github.com/shiftschedule
 
-go 1.25.1
+go 1.25.4
 
 require (
 	github.com/gin-gonic/gin v1.11.0
+	github.com/go-chi/chi/v5 v5.2.3
 	github.com/jackc/pgx/v5 v5.7.6
 	github.com/rs/zerolog v1.34.0
 	github.com/spf13/viper v1.21.0

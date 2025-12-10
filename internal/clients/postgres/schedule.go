@@ -28,7 +28,7 @@ func (p *Postgres) GetSchedules() ([]*models.ShiftSchedule, error) {
 }
 
 // GetSchedule get the schedule with name from the db.
-func (p *Postgres) GetSchedule(name string) ([]*models.ShiftSchedule, error) {
+func (p *Postgres) GetScheduleByName(name string) ([]*models.ShiftSchedule, error) {
 	query := `
 		SELECT 
 			s.id,
@@ -42,6 +42,28 @@ func (p *Postgres) GetSchedule(name string) ([]*models.ShiftSchedule, error) {
 		WHERE s.name = $1
 	`
 	schedules, err := Query(p, query, mapRowToShiftSchedule, name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query db. %w", err)
+	}
+
+	return schedules, nil
+}
+
+// GetSchedule get the schedule with name from the db.
+func (p *Postgres) GetScheduleByWeek(week int) ([]*models.ShiftSchedule, error) {
+	query := `
+		SELECT 
+			s.id,
+			s.name,
+			s.weeknumber,
+			s.assignee,
+			s.substitute,
+			s.comment,
+			s.accepted
+		FROM shiftschedule s
+		WHERE s.weeknumber = $1
+	`
+	schedules, err := Query(p, query, mapRowToShiftSchedule, week)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query db. %w", err)
 	}
@@ -67,20 +89,22 @@ func (p *Postgres) NewSchedule(name string, weeknumber int, assignee *int, subst
 }
 
 // UpdateSchedule updates a schedule.
-func (p *Postgres) UpdateSchedule(personnelName, newPersonnelName string) ([]*models.ShiftSchedule, error) {
+func (p *Postgres) UpdateSchedule(personnelName, newPersonnelName string) error {
 	query := `
 	UPDATE shiftschedule s
 	WHERE s.name = $1
 	SET p.name = $2
 	`
-	return Query(p, query, mapRowToShiftSchedule, personnelName, newPersonnelName)
+	_, err := Query(p, query, mapRowToShiftSchedule, personnelName, newPersonnelName)
+
+	return err
 }
 
 // DeleteSchedule deletes a schedule.
 func (p *Postgres) DeleteSchedule(personnelName string) error {
 	query := `
-		DELETE FROM shiftschedule p
-		WHERE p.name = $1
+		DELETE FROM shiftschedule s
+		WHERE s.name = $1
 	`
 
 	_, err := Query(p, query, mapRowToShiftSchedule, personnelName)
@@ -89,7 +113,7 @@ func (p *Postgres) DeleteSchedule(personnelName string) error {
 }
 
 // GetSchedulePersonnel gets all personnel assigned a specific schedule.
-func (p *Postgres) GetSchedulePersonnel(scheduleName string) (*models.ScheduleTypePersonnel, error) {
+func (p *Postgres) GetSchedulePersonnel(scheduleName string) ([]*models.ScheduleTypePersonnel, error) {
 	query := `
 		SELECT p.id, p.name
 		FROM personnel p
@@ -99,15 +123,10 @@ func (p *Postgres) GetSchedulePersonnel(scheduleName string) (*models.ScheduleTy
 		GROUP BY p.id, p.name
 		ORDER BY p.id;
 	`
-	personnel, err := Query(p, query, mapRowToPersonnel, scheduleName)
+	result, err := Query(p, query, mapRowToSheduleTypePersonnel, scheduleName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query db. %w", err)
 	}
 
-	result := models.ScheduleTypePersonnel{
-		Personnel: personnel,
-		// TODO: Fix so entire schedule is here
-		ScheduleType: models.ScheduleType{Name: scheduleName},
-	}
-	return &result, nil
+	return result, nil
 }

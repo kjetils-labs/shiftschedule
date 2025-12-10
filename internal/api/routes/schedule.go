@@ -1,28 +1,31 @@
 package routes
 
-import "github.com/gin-gonic/gin"
+import (
+	"net/http"
 
-func GetScheduleAll() gin.HandlerFunc {
-	return func(c *gin.Context) {
-	}
+	"github.com/shiftschedule/internal/clients/postgres"
+)
+
+type ScheduleHandler struct {
+	pg *postgres.Postgres
 }
 
-func GetScheduleByName() gin.HandlerFunc {
-	return func(c *gin.Context) {
-	}
+func (s *ScheduleHandler) GetScheduleAll(w http.ResponseWriter, r *http.Request) error {
+	return nil
 }
 
-func NewSchedule() gin.HandlerFunc {
-	return func(c *gin.Context) {
-	}
+func (s *ScheduleHandler) GetScheduleByName(w http.ResponseWriter, r *http.Request) error {
+	return nil
 }
 
-func UpdateSchedule() gin.HandlerFunc {
-	return func(c *gin.Context) {
-	}
+func (s *ScheduleHandler) NewSchedule(w http.ResponseWriter, r *http.Request) error {
+	return nil
 }
 
-func DeleteSchedule() gin.HandlerFunc {
-	return func(c *gin.Context) {
-	}
+func (s *ScheduleHandler) UpdateSchedule(w http.ResponseWriter, r *http.Request) error {
+	return nil
+}
+
+func (s *ScheduleHandler) DeleteSchedule(w http.ResponseWriter, r *http.Request) error {
+	return nil
 }

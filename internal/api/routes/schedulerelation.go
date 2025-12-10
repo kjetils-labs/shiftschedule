@@ -7,6 +7,10 @@ import (
 	"github.com/shiftschedule/internal/clients/postgres"
 )
 
+type ScheduleRelation struct {
+	pg *postgres.Postgres
+}
+
 func GetScheduleRelationBySchedule(pg *postgres.Postgres) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		scheduleRelation, err := pg.GetSchedulePersonnel(c.Query("name"))

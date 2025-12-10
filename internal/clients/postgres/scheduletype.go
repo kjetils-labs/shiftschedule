@@ -30,7 +30,7 @@ func (p *Postgres) GetScheduleType(name string) ([]*models.ScheduleType, error) 
 			s.id,
 			s.name,
 			s.description,
-		FROM schedulel_type s
+		FROM schedule_type s
 		WHERE s.name = $1
 	`
 	schedules, err := Query(p, query, mapRowToScheduleType, name)
@@ -39,4 +39,28 @@ func (p *Postgres) GetScheduleType(name string) ([]*models.ScheduleType, error) 
 	}
 
 	return schedules, nil
+}
+
+// UpdateScheduleType updates a schedule type.
+func (p *Postgres) UpdateScheduleType(name string, newSchedule *models.ScheduleType) error {
+	query := `
+	UPDATE schedule_type s
+	WHERE s.name = $1
+	SET p.name = $2
+	SET p.description = $3
+	`
+	_, err := Query(p, query, mapRowToScheduleType, name, newSchedule.Name, newSchedule.Description)
+	return err
+}
+
+// DeleteScheduleType deletes a schedule type.
+func (p *Postgres) DeleteScheduleType(name string) error {
+	query := `
+		DELETE FROM schedule_type s
+		WHERE s.name = $1
+	`
+
+	_, err := Query(p, query, mapRowToShiftSchedule, name)
+
+	return err
 }
