@@ -78,7 +78,7 @@ func setupPersonnel(r chi.Router) {
 
 	r.Route("/personnel", func(r chi.Router) {
 		r.Get("/", wrap(personnel.GetPersonnelAll))
-		r.Get("/{id}", wrap(personnel.GetPersonnelByName))
+		r.Get("/{name}", wrap(personnel.GetPersonnelByName))
 		r.Post("/", wrap(personnel.NewPersonnel))
 		r.Patch("{id}", wrap(personnel.UpdatePersonnel))
 		r.Delete("/{id}", wrap(personnel.DeletePersonnel))
@@ -90,13 +90,21 @@ func setupSchedule(r chi.Router) {
 
 	r.Route("/schedule", func(r chi.Router) {
 		r.Get("/", wrap(schedule.GetScheduleAll))
+		r.Get("/{name}", wrap(schedule.GetScheduleByName))
+		r.Post("/", wrap(schedule.NewSchedule))
+		r.Patch("/{id}", wrap(schedule.UpdateSchedule))
+		r.Delete("/{id}", wrap(schedule.DeleteSchedule))
 	})
 }
 
 func setupScheduleType(r chi.Router) {
 	scheduleType := routes.ScheduleTypeHandler{}
 
-	r.Route("/schedule", func(r chi.Router) {
+	r.Route("/scheduletype", func(r chi.Router) {
 		r.Get("/", wrap(scheduleType.GetScheduleTypeAll))
+		r.Get("/{name}", wrap(scheduleType.GetScheduleTypeByName))
+		r.Post("/", wrap(scheduleType.NewScheduleType))
+		r.Patch("/{id}", wrap(scheduleType.UpdateScheduleType))
+		r.Delete("/{id}", wrap(scheduleType.DeleteScheduleType))
 	})
 }
