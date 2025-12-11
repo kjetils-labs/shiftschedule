@@ -62,44 +62,41 @@ func InitHttpServer(ctx context.Context, pg *postgres.Postgres, address string) 
 	return srv, nil
 }
 
-func setupRoutes(router *chi.Mux) error {
+func setupRoutes(r *chi.Mux) error {
 
-	router.Mount("/v1", setupV1Routes())
-	//
-	// healthcheck := v1.Group("/healthcheck")
-	// healthcheck.GET("/ping", routes.Ping())
-	//
-	// personnel := v1.Group("/personnel")
-	// personnel.GET("", routes.GetPersonnelAll(pg))
-	// personnel.GET("/:personnelName", routes.GetPersonnelByName(pg))
-	// personnel.POST("", routes.NewPersonnel(pg))
-	// personnel.PUT("/:personelKey", routes.UpdatePersonnel(pg))
-	// personnel.DELETE("/:personelKey", routes.DeletePersonnel(pg))
+	r.Route("/v1", func(r chi.Router) {
+		setupPersonnel(r)
+		setupSchedule(r)
+		setupScheduleType(r)
+	})
 
 	return nil
 }
 
-func setupV1Routes() chi.Router {
-	r := chi.NewRouter()
-
-	r.Route("/v1", setupPersonnel)
-	r.Route("/v1", setupSchedule)
-	r.Route("/v1", setupScheduleType)
-
-	return r
-}
-
 func setupPersonnel(r chi.Router) {
 	personnel := routes.PersonnelHandler{}
-	r.Get("/personnel", wrap(personnel.GetPersonnelAll))
+
+	r.Route("/personnel", func(r chi.Router) {
+		r.Get("/", wrap(personnel.GetPersonnelAll))
+		r.Get("/{id}", wrap(personnel.GetPersonnelByName))
+		r.Post("/", wrap(personnel.NewPersonnel))
+		r.Patch("{id}", wrap(personnel.UpdatePersonnel))
+		r.Delete("/{id}", wrap(personnel.DeletePersonnel))
+	})
 }
 
 func setupSchedule(r chi.Router) {
 	schedule := routes.ScheduleHandler{}
-	r.Get("/schedule", wrap(schedule.GetScheduleAll))
+
+	r.Route("/schedule", func(r chi.Router) {
+		r.Get("/", wrap(schedule.GetScheduleAll))
+	})
 }
 
 func setupScheduleType(r chi.Router) {
 	scheduleType := routes.ScheduleTypeHandler{}
-	r.Get("/scheduletype", wrap(scheduleType.GetScheduleTypeAll))
+
+	r.Route("/schedule", func(r chi.Router) {
+		r.Get("/", wrap(scheduleType.GetScheduleTypeAll))
+	})
 }
