@@ -2,6 +2,7 @@ package routes
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -88,5 +89,46 @@ func (p *PersonnelHandler) UpdatePersonnel(w http.ResponseWriter, r *http.Reques
 }
 
 func (p *PersonnelHandler) DeletePersonnel(w http.ResponseWriter, r *http.Request) error {
+	name := chi.URLParam(r, "name")
+	if name != "" {
+		return errors.New("mandatory parameter 'name' is empty or missing")
+	}
+	err := p.pg.DeletePersonnel(name)
+	if err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusAccepted)
+
 	return nil
 }
+
+// import "github.com/go-playground/validator/v10"
+//
+// var validate = validator.New()
+//
+// type CreateUserRequest struct {
+//     Name  string `json:"name" validate:"required"`
+//     Email string `json:"email" validate:"required,email"`
+// }
+//
+// func CreateUser(w http.ResponseWriter, r *http.Request) {
+//     var req CreateUserRequest
+//     if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+//         http.Error(w, "invalid JSON", http.StatusBadRequest)
+//         return
+//     }
+//
+//     if err := validate.Struct(req); err != nil {
+//         http.Error(w, err.Error(), http.StatusBadRequest)
+//         return
+//     }
+//
+//     // Continue…
+// }
+
+// pageStr := r.URL.Query().Get("page")
+// if pageStr == "" {
+//     http.Error(w, "missing page parameter", http.StatusBadRequest)
+//     return
+// }
