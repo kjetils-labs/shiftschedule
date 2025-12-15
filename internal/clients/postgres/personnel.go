@@ -55,6 +55,11 @@ func (p *Postgres) GetPersonnelSchedule(personnelName string) ([]*models.ShiftSc
 
 // NewPersonnel creates a person.
 func (p *Postgres) NewPersonnel(personnelNames []string) error {
+	for i, name := range personnelNames {
+		if name == "" {
+			return fmt.Errorf("name at index %d is empty", i)
+		}
+	}
 	logger := zerolog.Ctx(p.Ctx)
 	query := `
 		INSERT INTO personnel (name)

@@ -77,11 +77,11 @@ func setupPersonnel(r chi.Router) {
 	personnel := routes.PersonnelHandler{}
 
 	r.Route("/personnel", func(r chi.Router) {
-		r.Get("/", wrap(personnel.GetPersonnelAll))
-		r.Get("/{name}", wrap(personnel.GetPersonnelByName))
-		r.Post("/", wrap(personnel.NewPersonnel))
-		r.Patch("{id}", wrap(personnel.UpdatePersonnel))
-		r.Delete("/{id}", wrap(personnel.DeletePersonnel))
+		r.Get("/", personnel.GetPersonnelAll)
+		r.Get("/{name}", personnel.GetPersonnelByName)
+		r.Post("/", personnel.NewPersonnel)
+		r.Patch("{id}", personnel.UpdatePersonnel)
+		r.Delete("/{id}", personnel.DeletePersonnel)
 	})
 }
 

@@ -1,9 +1,12 @@
 package httpsuite
 
 import (
+	"context"
 	"encoding/json"
-	"log"
+	"fmt"
 	"net/http"
+
+	"github.com/rs/zerolog"
 )
 
 // Code shamelessly copied from this:
@@ -16,21 +19,26 @@ type Response[T any] struct {
 	Body    T      `json:"body,omitempty"`
 }
 
+type emptyResponse struct{}
+
+func GetEmptyResponse() *emptyResponse {
+	return &emptyResponse{}
+}
+
 // Marshal serializes the Response struct into a JSON byte slice.
 // It logs an error if marshalling fails.
-func (r *Response[T]) Marshal() []byte {
+func (r *Response[T]) Marshal() ([]byte, error) {
 	jsonResponse, err := json.Marshal(r)
 	if err != nil {
-		// TODO: Implement correct logging
-		log.Printf("failed to marshal response: %v", err)
+		return nil, fmt.Errorf("failed to marshal response: %v", err)
 	}
 
-	return jsonResponse
+	return jsonResponse, nil
 }
 
 // SendResponse creates a Response struct, serializes it to JSON, and writes it to the provided http.ResponseWriter.
 // If the body parameter is non-nil, it will be included in the response body.
-func SendResponse[T any](w http.ResponseWriter, message string, code int, body *T) {
+func SendResponse[T any](ctx context.Context, w http.ResponseWriter, message string, code int, body *T) {
 	response := &Response[T]{
 		Code:    code,
 		Message: message,
@@ -39,20 +47,23 @@ func SendResponse[T any](w http.ResponseWriter, message string, code int, body *
 		response.Body = *body
 	}
 
-	writeResponse[T](w, response)
+	writeJSONResponse(ctx, w, response)
 }
 
 // writeResponse serializes a Response and writes it to the http.ResponseWriter with appropriate headers.
 // If an error occurs during the write, it logs the error and sends a 500 Internal Server Error response.
-func writeResponse[T any](w http.ResponseWriter, r *Response[T]) {
-	jsonResponse := r.Marshal()
+func writeJSONResponse[T any](ctx context.Context, w http.ResponseWriter, r *Response[T]) {
+	logger := zerolog.Ctx(ctx)
+	jsonResponse, err := r.Marshal()
+	if err != nil {
+		logger.Error().Ctx(ctx).Err(err).Msg("failed to marshal response")
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(r.Code)
 
 	if _, err := w.Write(jsonResponse); err != nil {
-		// TODO: Implement correct logging
-		log.Printf("Error writing response: %v", err)
+		logger.Error().Ctx(ctx).Err(err).Msg("failed writing response")
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}
 }

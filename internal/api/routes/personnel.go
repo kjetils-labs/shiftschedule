@@ -1,106 +1,98 @@
 package routes
 
 import (
+	"context"
 	"encoding/json"
-	"errors"
-	"fmt"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/shiftschedule/internal/api/httpsuite"
 	"github.com/shiftschedule/internal/clients/postgres"
 )
 
 type PersonnelHandler struct {
-	pg *postgres.Postgres
+	ctx context.Context
+	pg  *postgres.Postgres
 }
 
-func (p *PersonnelHandler) GetPersonnelAll(w http.ResponseWriter, r *http.Request) error {
+type nameRequest struct {
+	Name string `json:"name" binding:"required"`
+}
+
+func (p *PersonnelHandler) GetPersonnelAll(w http.ResponseWriter, r *http.Request) {
 	personnel, err := p.pg.GetPersonnel()
 	if err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-
-	err = json.NewEncoder(w).Encode(personnel)
-	if err != nil {
-		writeJSONError(w, "failed to encode response", http.StatusInternalServerError)
-		w.WriteHeader(http.StatusInternalServerError)
-		return err
+		httpsuite.WriteJSONError(w, "failed to get personnel", http.StatusInternalServerError)
 	}
 
-	return nil
+	httpsuite.SendResponse(p.ctx, w, "", http.StatusOK, &personnel)
 }
 
-func (p *PersonnelHandler) GetPersonnelByName(w http.ResponseWriter, r *http.Request) error {
+func (p *PersonnelHandler) GetPersonnelByName(w http.ResponseWriter, r *http.Request) {
+
+	input := nameRequest{
+		Name: chi.URLParam(r, "name"),
+	}
+
+	validationErr := httpsuite.IsRequestValid(input)
+	if validationErr != nil {
+		httpsuite.SendResponse(p.ctx, w, "validation error", http.StatusBadRequest, &input)
+		return
+	}
 	personnel, err := p.pg.GetPersonnelByName(chi.URLParam(r, "name"))
 	if err != nil {
-		return err
+		httpsuite.WriteJSONError(w, "failed to get personnel", http.StatusInternalServerError)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-
-	err = json.NewEncoder(w).Encode(personnel)
-	if err != nil {
-		writeJSONError(w, "failed to encode response", http.StatusInternalServerError)
-		w.WriteHeader(http.StatusInternalServerError)
-		return err
-	}
-
-	return nil
+	httpsuite.SendResponse(p.ctx, w, "", http.StatusOK, &personnel)
 }
 
-func (p *PersonnelHandler) NewPersonnel(w http.ResponseWriter, r *http.Request) error {
+func (p *PersonnelHandler) NewPersonnel(w http.ResponseWriter, r *http.Request) {
 
 	var input struct {
-		Names []string `json:"names" binding:"required"`
+		Names []string `json:"names" binding:"required,unique"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		writeJSONError(w, "failed to bind input", http.StatusBadRequest)
-		w.WriteHeader(http.StatusBadRequest)
-		return err
+		httpsuite.SendResponse(p.ctx, w, "failed to bind input", http.StatusBadRequest, &err)
+		return
 	}
 
-	if len(input.Names) == 0 {
-
-	}
-	for i, name := range input.Names {
-		if name == "" {
-			writeJSONError(w, fmt.Sprintf("input name entry indexed %d is empty", i), http.StatusBadRequest)
-			return fmt.Errorf("input name entry indexed %d is empty", i)
-		}
+	validationErr := httpsuite.IsRequestValid(input)
+	if validationErr != nil {
+		httpsuite.SendResponse(p.ctx, w, "validation error", http.StatusBadRequest, validationErr)
+		return
 	}
 
 	err := p.pg.NewPersonnel(input.Names)
 	if err != nil {
-		writeJSONError(w, "failed to update database", http.StatusInternalServerError)
-		return err
+		httpsuite.SendResponse(p.ctx, w, "failed to update", http.StatusInternalServerError, &err)
+		return
 	}
 
-	w.WriteHeader(http.StatusCreated)
-
-	return nil
+	httpsuite.SendResponse(p.ctx, w, "personnel created", http.StatusCreated, httpsuite.GetEmptyResponse())
 }
 
-func (p *PersonnelHandler) UpdatePersonnel(w http.ResponseWriter, r *http.Request) error {
-	return nil
+func (p *PersonnelHandler) UpdatePersonnel(w http.ResponseWriter, r *http.Request) {
 }
 
-func (p *PersonnelHandler) DeletePersonnel(w http.ResponseWriter, r *http.Request) error {
-	name := chi.URLParam(r, "name")
-	if name != "" {
-		return errors.New("mandatory parameter 'name' is empty or missing")
+func (p *PersonnelHandler) DeletePersonnel(w http.ResponseWriter, r *http.Request) {
+	input := nameRequest{
+		Name: chi.URLParam(r, "name"),
 	}
-	err := p.pg.DeletePersonnel(name)
+
+	validationErr := httpsuite.IsRequestValid(input)
+	if validationErr != nil {
+		httpsuite.SendResponse(p.ctx, w, "validation error", http.StatusBadRequest, validationErr)
+		return
+	}
+
+	err := p.pg.DeletePersonnel(input.Name)
 	if err != nil {
-		return err
+		httpsuite.SendResponse(p.ctx, w, "failed to update", http.StatusInternalServerError, &err)
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusAccepted)
 
-	return nil
+	httpsuite.SendResponse(p.ctx, w, "personnel deleted", http.StatusAccepted, httpsuite.GetEmptyResponse())
 }
 
 // import "github.com/go-playground/validator/v10"
