@@ -6,8 +6,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	_ "github.com/lib/pq"
 )
 
@@ -15,17 +13,6 @@ var (
 	ErrMissingConfig     = errors.New("missing config")
 	ErrTableCreateFailed = errors.New("failed to create table")
 )
-
-// PgxIface abstracts the pgxpool so we can mock pgx connections for testing.
-// The implementation has to match the pgxpool functionality that is available.
-type PgxIface interface {
-	Begin(context.Context) (pgx.Tx, error)
-	Exec(context.Context, string, ...any) (pgconn.CommandTag, error)
-	QueryRow(context.Context, string, ...any) pgx.Row
-	Query(context.Context, string, ...any) (pgx.Rows, error)
-	Ping(context.Context) error
-	Close()
-}
 
 func NewURL(username, password, hostname string, port int, database string, tls bool) string {
 	// urlExample := "postgres://username:password@localhost:5432/database_name"
