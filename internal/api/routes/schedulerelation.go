@@ -1,37 +1,56 @@
 package routes
 
 import (
+	"context"
+	"encoding/json"
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
+	"github.com/shiftschedule/internal/api/httpsuite"
 	"github.com/shiftschedule/internal/clients/postgres"
 )
 
 type ScheduleRelationHandler struct {
-	pg *postgres.Postgres
+	Ctx context.Context
+	Dbc *postgres.DatabaseConnection
 }
 
-func (s *ScheduleRelationHandler) GetScheduleRelationBySchedule(w http.ResponseWriter, r *http.Request) error {
-	// scheduleRelation, err := pg.GetSchedulePersonnel(c.Query("name"))
-	// if err != nil {
-	// 	c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-	// 	return
-	// }
-	// c.JSON(http.StatusOK, scheduleRelation)
+func (s *ScheduleRelationHandler) GetScheduleRelations(w http.ResponseWriter, r *http.Request) {
+	schedulestypes, err := s.Dbc.GetScheduleRelations()
+	if err != nil {
+		httpsuite.WriteJSONError(w, "failed to get schedule types", http.StatusInternalServerError)
+	}
 
-	return nil
+	httpsuite.SendResponse(s.Ctx, w, "", http.StatusOK, &schedulestypes)
 }
 
-func (s *ScheduleRelationHandler) GetScheduleRelationByPersonnel(w http.ResponseWriter, r *http.Request) error {
+func (s *ScheduleRelationHandler) GetScheduleRelationByPersonnelID(w http.ResponseWriter, r *http.Request) {
+
+	var input struct {
+		ID string `json:"id" binding:"required"`
+	}
+
+	input.ID = chi.URLParam(r, "id")
+
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		httpsuite.SendResponse(s.Ctx, w, "failed to bind input", http.StatusBadRequest, &err)
+		return
+	}
+
+	validationErr := httpsuite.IsRequestValid(input)
+	if validationErr != nil {
+		httpsuite.SendResponse(s.Ctx, w, "validation error", http.StatusBadRequest, validationErr)
+		return
+	}
 	// personnel, err := pg.GetPersonnelSchedule(c.Query("name"))
 	// if err != nil {
 	// 	c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 	// 	return
 	// }
 	// c.JSON(http.StatusOK, personnel)
-	return nil
 }
 
-func (s *ScheduleRelationHandler) NewScheduleRelation(w http.ResponseWriter, r *http.Request) error {
+func (s *ScheduleRelationHandler) NewScheduleRelation(w http.ResponseWriter, r *http.Request) {
 
 	// var input struct {
 	// 	PersonnelName string `json:"personnel_name" binding:"required"`
@@ -50,5 +69,4 @@ func (s *ScheduleRelationHandler) NewScheduleRelation(w http.ResponseWriter, r *
 	// }
 
 	// c.JSON(http.StatusCreated, gin.H{"message": "personnel created"})
-	return nil
 }

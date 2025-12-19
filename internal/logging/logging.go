@@ -33,7 +33,7 @@ func (z zerologHook) Run(e *zerolog.Event, _ zerolog.Level, _ string) {
 	}
 }
 
-// New initializes global log settings.
+// New initializes global log settings then puts the settings into the context object.
 func New(ctx context.Context, logLevel int) (context.Context, error) {
 
 	if logLevel > math.MaxInt8 || logLevel < math.MinInt8 {

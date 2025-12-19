@@ -1,5 +1,9 @@
 package postgres_test
 
-func TestPersonnel() {
+import (
+	"testing"
+)
+
+func TestPersonnel(t *testing.T) {
 
 }

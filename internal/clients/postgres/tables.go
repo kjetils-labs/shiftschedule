@@ -6,24 +6,24 @@ import (
 	"github.com/rs/zerolog"
 )
 
-func (p *Postgres) CreateTables() error {
+func (dbc *DatabaseConnection) CreateTables() error {
 
-	err := p.createTablePersonnel()
+	err := dbc.createTablePersonnel()
 	if err != nil {
 		return err
 	}
 
-	err = p.createTableShiftschedule()
+	err = dbc.createTableShiftschedule()
 	if err != nil {
 		return err
 	}
 
-	err = p.createTableScheduleType()
+	err = dbc.createTableScheduleType()
 	if err != nil {
 		return err
 	}
 
-	err = p.createTableScheduleTypePersonnel()
+	err = dbc.createTableScheduleRelation()
 	if err != nil {
 		return err
 	}
@@ -31,7 +31,7 @@ func (p *Postgres) CreateTables() error {
 	return nil
 }
 
-func (p *Postgres) createTablePersonnel() error {
+func (dbc *DatabaseConnection) createTablePersonnel() error {
 
 	query := `
 		CREATE TABLE personnel (
@@ -39,7 +39,7 @@ func (p *Postgres) createTablePersonnel() error {
 			name TEXT NOT NULL
 		);
 		`
-	err := p.CreateTable(query, "personnel")
+	err := dbc.CreateTable(query, "personnel")
 	if err != nil {
 		return err
 	}
@@ -47,7 +47,7 @@ func (p *Postgres) createTablePersonnel() error {
 	return nil
 }
 
-func (p *Postgres) createTableShiftschedule() error {
+func (dbc *DatabaseConnection) createTableShiftschedule() error {
 
 	query := `
 		CREATE TABLE shiftschedule (
@@ -61,14 +61,14 @@ func (p *Postgres) createTableShiftschedule() error {
 			accepted BOOLEAN DEFAULT FALSE
 		);
 		`
-	err := p.CreateTable(query, "shiftschedule")
+	err := dbc.CreateTable(query, "shiftschedule")
 	if err != nil {
 		return err
 	}
 
 	return nil
 }
-func (p *Postgres) createTableScheduleType() error {
+func (dbc *DatabaseConnection) createTableScheduleType() error {
 
 	query := `
 		CREATE TABLE schedule_type (
@@ -77,23 +77,23 @@ func (p *Postgres) createTableScheduleType() error {
 			description TEXT
 		);
 		`
-	err := p.CreateTable(query, "schedule_type")
+	err := dbc.CreateTable(query, "schedule_type")
 	if err != nil {
 		return err
 	}
 
 	return nil
 }
-func (p *Postgres) createTableScheduleTypePersonnel() error {
+func (dbc *DatabaseConnection) createTableScheduleRelation() error {
 
 	query := `
-		CREATE TABLE schedule_type_personnel (
+		CREATE TABLE schedule_relation (
 			schedule_type_id INT REFERENCES schedule_type(id) ON DELETE CASCADE,
 			personnel_id INT REFERENCES personnel(id) ON DELETE CASCADE,
 			PRIMARY KEY (schedule_type_id, personnel_id)
 		);
 		`
-	err := p.CreateTable(query, "schedule_type_personnel")
+	err := dbc.CreateTable(query, "schedule_relation")
 	if err != nil {
 		return err
 	}
@@ -101,18 +101,18 @@ func (p *Postgres) createTableScheduleTypePersonnel() error {
 	return nil
 }
 
-func (p *Postgres) CreateTable(name string, query string) error {
+func (dbc *DatabaseConnection) CreateTable(name string, query string) error {
 
-	logger := zerolog.Ctx(p.Ctx)
+	logger := zerolog.Ctx(dbc.Ctx)
 
-	err := p.TableExists(name)
+	err := dbc.VerifyTable(name)
 	if err == nil {
 		logger.Info().Str("name", name).Msg("table already exists")
 		return nil
 	}
 
 	logger.Info().Str("name", name).Msg("table missing, creating")
-	err = p.Execute(query)
+	err = Execute(dbc, query)
 	if err != nil {
 		return errors.Join(err, ErrTableCreateFailed, errors.New("failed to create table "+name))
 	}
@@ -120,16 +120,18 @@ func (p *Postgres) CreateTable(name string, query string) error {
 	return nil
 }
 
-func (p *Postgres) TableExists(name string) error {
+// VerifyTable checks if the table named "name" exists.
+func (dbc *DatabaseConnection) VerifyTable(name string) error {
 
-	err := p.Execute(`
+	query := `
 		SELECT EXISTS (
-            SELECT 1
-            FROM   information_schema.tables
-            WHERE  table_schema = 'public'
-            AND    table_name = $1
+			SELECT 1
+			FROM   information_schema.tables
+			WHERE  table_schema = 'public'
+			AND    table_name = $1
 		)
-		`, name)
+		`
+	err := Execute(dbc, query, name)
 
 	if err != nil {
 		return err

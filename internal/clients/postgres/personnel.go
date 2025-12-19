@@ -8,7 +8,7 @@ import (
 )
 
 // GetPersonnel gets current existing personnel.
-func (p *Postgres) GetPersonnel() ([]*models.Personnel, error) {
+func (dbc *DatabaseConnection) GetPersonnel() ([]*models.Personnel, error) {
 	query := `
 		SELECT p.id, p.name
 		FROM personnel p
@@ -16,11 +16,11 @@ func (p *Postgres) GetPersonnel() ([]*models.Personnel, error) {
 		ORDER BY p.id;
 	`
 
-	return Query(p, query, mapRowToPersonnel)
+	return Query(dbc, query, mapRowToPersonnel)
 }
 
 // GetPersonnel gets current existing personnel.
-func (p *Postgres) GetPersonnelByName(personnelName string) ([]*models.Personnel, error) {
+func (dbc *DatabaseConnection) GetPersonnelByName(personnelName string) ([]*models.Personnel, error) {
 	query := `
 		SELECT p.id, p.name
 		FROM personnel p
@@ -29,11 +29,11 @@ func (p *Postgres) GetPersonnelByName(personnelName string) ([]*models.Personnel
 		ORDER BY p.id;
 	`
 
-	return Query(p, query, mapRowToPersonnel, personnelName)
+	return Query(dbc, query, mapRowToPersonnel, personnelName)
 }
 
 // GetPersonnelSchedule gets the personnel's assigned schedules.
-func (p *Postgres) GetPersonnelSchedule(personnelName string) ([]*models.ShiftSchedule, error) {
+func (dbc *DatabaseConnection) GetPersonnelSchedule(personnelName string) ([]*models.ShiftSchedule, error) {
 	query := `
 		SELECT 
 			s.id,
@@ -50,17 +50,17 @@ func (p *Postgres) GetPersonnelSchedule(personnelName string) ([]*models.ShiftSc
 		ORDER BY s.weeknumber;
 	`
 
-	return Query(p, query, mapRowToShiftSchedule, personnelName)
+	return Query(dbc, query, mapRowToShiftSchedule, personnelName)
 }
 
 // NewPersonnel creates a person.
-func (p *Postgres) NewPersonnel(personnelNames []string) error {
+func (dbc *DatabaseConnection) NewPersonnel(personnelNames []string) error {
 	for i, name := range personnelNames {
 		if name == "" {
 			return fmt.Errorf("name at index %d is empty", i)
 		}
 	}
-	logger := zerolog.Ctx(p.Ctx)
+	logger := zerolog.Ctx(dbc.Ctx)
 	query := `
 		INSERT INTO personnel (name)
 		VALUES 
@@ -75,9 +75,9 @@ func (p *Postgres) NewPersonnel(personnelNames []string) error {
 		args = append(args, name)
 	}
 
-	logger.Debug().Ctx(p.Ctx).Int("args_count", len(args)).Str("query", query).Send()
+	logger.Debug().Ctx(dbc.Ctx).Int("args_count", len(args)).Str("query", query).Send()
 
-	err := p.Execute(query, args...)
+	err := Execute(dbc, query, args...)
 	if err != nil {
 		return err
 	}
@@ -86,23 +86,23 @@ func (p *Postgres) NewPersonnel(personnelNames []string) error {
 }
 
 // UpdatePersonnel updates a person.
-func (p *Postgres) UpdatePersonnel(personnelName, newPersonnelName string) ([]*models.ShiftSchedule, error) {
+func (dbc *DatabaseConnection) UpdatePersonnel(personnelName, newPersonnelName string) ([]*models.ShiftSchedule, error) {
 	query := `
 	UPDATE personnel p
 	WHERE p.name = $1
 	SET p.name = $2
 	`
-	return Query(p, query, mapRowToShiftSchedule, personnelName, newPersonnelName)
+	return Query(dbc, query, mapRowToShiftSchedule, personnelName, newPersonnelName)
 }
 
 // DeletePersonnel deletes a person.
-func (p *Postgres) DeletePersonnel(personnelName string) error {
+func (dbc *DatabaseConnection) DeletePersonnel(personnelName string) error {
 	query := `
 		DELETE FROM personnel
 		WHERE p.name = $1
 	`
 
-	_, err := Query(p, query, mapRowToShiftSchedule, personnelName)
+	_, err := Query(dbc, query, mapRowToShiftSchedule, personnelName)
 
 	return err
 }

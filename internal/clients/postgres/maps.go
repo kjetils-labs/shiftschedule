@@ -1,11 +1,12 @@
 package postgres
 
 import (
-	"github.com/jackc/pgx/v5"
+	"database/sql"
+
 	"github.com/shiftschedule/internal/models"
 )
 
-func mapRowToPersonnel(rows pgx.Rows) (*models.Personnel, error) {
+func mapRowToPersonnel(rows *sql.Rows) (*models.Personnel, error) {
 	var p models.Personnel
 	if err := rows.Scan(&p.ID, &p.Name); err != nil {
 		return &models.Personnel{}, err
@@ -13,7 +14,7 @@ func mapRowToPersonnel(rows pgx.Rows) (*models.Personnel, error) {
 	return &p, nil
 }
 
-func mapRowToShiftSchedule(rows pgx.Rows) (*models.ShiftSchedule, error) {
+func mapRowToShiftSchedule(rows *sql.Rows) (*models.ShiftSchedule, error) {
 	var s models.ShiftSchedule
 	if err := rows.Scan(
 		&s.ID,
@@ -29,7 +30,7 @@ func mapRowToShiftSchedule(rows pgx.Rows) (*models.ShiftSchedule, error) {
 	return &s, nil
 }
 
-func mapRowToScheduleType(rows pgx.Rows) (*models.ScheduleType, error) {
+func mapRowToScheduleType(rows *sql.Rows) (*models.ScheduleType, error) {
 	var s models.ScheduleType
 	if err := rows.Scan(
 		&s.ID,
@@ -41,13 +42,13 @@ func mapRowToScheduleType(rows pgx.Rows) (*models.ScheduleType, error) {
 	return &s, nil
 }
 
-func mapRowToSheduleTypePersonnel(rows pgx.Rows) (*models.ScheduleTypePersonnel, error) {
-	var s models.ScheduleTypePersonnel
+func mapRowToSheduleRelation(rows *sql.Rows) (*models.ScheduleRelation, error) {
+	var s models.ScheduleRelation
 	if err := rows.Scan(
 		&s.Personnel,
 		&s.ScheduleType,
 	); err != nil {
-		return &models.ScheduleTypePersonnel{}, err
+		return &models.ScheduleRelation{}, err
 	}
 	return &s, nil
 }

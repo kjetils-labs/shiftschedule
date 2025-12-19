@@ -26,7 +26,7 @@ func main() {
 	}
 	logger.Info().Msg("configuration loaded")
 
-	pgConfig, err := postgres.NewPostgresConfig(
+	url := postgres.NewURL(
 		config.PostgresUsername,
 		config.PostgresPassword,
 		config.PostgresHostname,
@@ -34,16 +34,13 @@ func main() {
 		config.PostgresDatabase,
 		config.PostgresEnableTLS,
 	)
-	if err != nil {
-		panic(err)
-	}
 
-	pg, err := postgres.Init(ctx, pgConfig)
+	dbc, err := postgres.SetupDB(ctx, url)
 	if err != nil {
 		panic(fmt.Errorf("failed to start postgres init. %w", err))
 	}
 	logger.Info().Msg("postgres initialization finished")
 
 	address := fmt.Sprintf("%v:%d", config.APIHostname, config.APIPort)
-	api.StartListening(ctx, pg, address)
+	api.StartListening(ctx, dbc, address)
 }

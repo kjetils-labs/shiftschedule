@@ -27,10 +27,16 @@ type ScheduleType struct {
 	Description *string `json:"description,omitempty" db:"description"`
 }
 
-// ScheduleTypePersonnel defines which personnel are eligible to participate in which schedule types.
-type ScheduleTypePersonnel struct {
+// ScheduleRelation defines which personnel are eligible to participate in which schedule types.
+type ScheduleRelation struct {
 	ScheduleType ScheduleType `json:"schedule_type" db:"schedule_type"`
 	Personnel    []*Personnel `json:"personnel" db:"personnel"`
+}
+
+// ScheduleRelationID defines which personnel are eligible to participate in which schedule types.
+type ScheduleRelationID struct {
+	ScheduleType int `json:"schedule_type" db:"schedule_type"`
+	Personnel    int `json:"personnel" db:"personnel"`
 }
 
 // ShiftSchedule represents a concrete schedule instance (e.g., a specific week).

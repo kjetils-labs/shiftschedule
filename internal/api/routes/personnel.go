@@ -11,8 +11,8 @@ import (
 )
 
 type PersonnelHandler struct {
-	ctx context.Context
-	pg  *postgres.Postgres
+	Ctx context.Context
+	Dbc *postgres.DatabaseConnection
 }
 
 type nameRequest struct {
@@ -20,12 +20,12 @@ type nameRequest struct {
 }
 
 func (p *PersonnelHandler) GetPersonnelAll(w http.ResponseWriter, r *http.Request) {
-	personnel, err := p.pg.GetPersonnel()
+	personnel, err := p.Dbc.GetPersonnel()
 	if err != nil {
 		httpsuite.WriteJSONError(w, "failed to get personnel", http.StatusInternalServerError)
 	}
 
-	httpsuite.SendResponse(p.ctx, w, "", http.StatusOK, &personnel)
+	httpsuite.SendResponse(p.Ctx, w, "", http.StatusOK, &personnel)
 }
 
 func (p *PersonnelHandler) GetPersonnelByName(w http.ResponseWriter, r *http.Request) {
@@ -36,15 +36,15 @@ func (p *PersonnelHandler) GetPersonnelByName(w http.ResponseWriter, r *http.Req
 
 	validationErr := httpsuite.IsRequestValid(input)
 	if validationErr != nil {
-		httpsuite.SendResponse(p.ctx, w, "validation error", http.StatusBadRequest, &input)
+		httpsuite.SendResponse(p.Ctx, w, "validation error", http.StatusBadRequest, &input)
 		return
 	}
-	personnel, err := p.pg.GetPersonnelByName(chi.URLParam(r, "name"))
+	personnel, err := p.Dbc.GetPersonnelByName(chi.URLParam(r, "name"))
 	if err != nil {
 		httpsuite.WriteJSONError(w, "failed to get personnel", http.StatusInternalServerError)
 	}
 
-	httpsuite.SendResponse(p.ctx, w, "", http.StatusOK, &personnel)
+	httpsuite.SendResponse(p.Ctx, w, "", http.StatusOK, &personnel)
 }
 
 func (p *PersonnelHandler) NewPersonnel(w http.ResponseWriter, r *http.Request) {
@@ -54,73 +54,43 @@ func (p *PersonnelHandler) NewPersonnel(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		httpsuite.SendResponse(p.ctx, w, "failed to bind input", http.StatusBadRequest, &err)
+		httpsuite.SendResponse(p.Ctx, w, "failed to bind input", http.StatusBadRequest, &err)
 		return
 	}
 
 	validationErr := httpsuite.IsRequestValid(input)
 	if validationErr != nil {
-		httpsuite.SendResponse(p.ctx, w, "validation error", http.StatusBadRequest, validationErr)
+		httpsuite.SendResponse(p.Ctx, w, "validation error", http.StatusBadRequest, validationErr)
 		return
 	}
 
-	err := p.pg.NewPersonnel(input.Names)
+	err := p.Dbc.NewPersonnel(input.Names)
 	if err != nil {
-		httpsuite.SendResponse(p.ctx, w, "failed to update", http.StatusInternalServerError, &err)
+		httpsuite.SendResponse(p.Ctx, w, "failed to update", http.StatusInternalServerError, &err)
 		return
 	}
 
-	httpsuite.SendResponse(p.ctx, w, "personnel created", http.StatusCreated, httpsuite.GetEmptyResponse())
+	httpsuite.SendResponse(p.Ctx, w, "personnel created", http.StatusCreated, httpsuite.GetEmptyResponse())
 }
 
 func (p *PersonnelHandler) UpdatePersonnel(w http.ResponseWriter, r *http.Request) {
 }
 
-func (p *PersonnelHandler) DeletePersonnel(w http.ResponseWriter, r *http.Request) {
+func (p *PersonnelHandler) DeletePersonnelByName(w http.ResponseWriter, r *http.Request) {
 	input := nameRequest{
 		Name: chi.URLParam(r, "name"),
 	}
 
 	validationErr := httpsuite.IsRequestValid(input)
 	if validationErr != nil {
-		httpsuite.SendResponse(p.ctx, w, "validation error", http.StatusBadRequest, validationErr)
+		httpsuite.SendResponse(p.Ctx, w, "validation error", http.StatusBadRequest, validationErr)
 		return
 	}
 
-	err := p.pg.DeletePersonnel(input.Name)
+	err := p.Dbc.DeletePersonnel(input.Name)
 	if err != nil {
-		httpsuite.SendResponse(p.ctx, w, "failed to update", http.StatusInternalServerError, &err)
+		httpsuite.SendResponse(p.Ctx, w, "failed to update", http.StatusInternalServerError, &err)
 	}
 
-	httpsuite.SendResponse(p.ctx, w, "personnel deleted", http.StatusAccepted, httpsuite.GetEmptyResponse())
+	httpsuite.SendResponse(p.Ctx, w, "personnel deleted", http.StatusAccepted, httpsuite.GetEmptyResponse())
 }
-
-// import "github.com/go-playground/validator/v10"
-//
-// var validate = validator.New()
-//
-// type CreateUserRequest struct {
-//     Name  string `json:"name" validate:"required"`
-//     Email string `json:"email" validate:"required,email"`
-// }
-//
-// func CreateUser(w http.ResponseWriter, r *http.Request) {
-//     var req CreateUserRequest
-//     if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-//         http.Error(w, "invalid JSON", http.StatusBadRequest)
-//         return
-//     }
-//
-//     if err := validate.Struct(req); err != nil {
-//         http.Error(w, err.Error(), http.StatusBadRequest)
-//         return
-//     }
-//
-//     // Continue…
-// }
-
-// pageStr := r.URL.Query().Get("page")
-// if pageStr == "" {
-//     http.Error(w, "missing page parameter", http.StatusBadRequest)
-//     return
-// }

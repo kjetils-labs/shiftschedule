@@ -7,7 +7,7 @@ import (
 )
 
 // GetSchedules gets all schedules in the db.
-func (p *Postgres) GetScheduleTypes() ([]*models.ScheduleType, error) {
+func (dbc *DatabaseConnection) GetScheduleTypes() ([]*models.ScheduleType, error) {
 	query := `
 		SELECT 
 			s.id,
@@ -15,7 +15,7 @@ func (p *Postgres) GetScheduleTypes() ([]*models.ScheduleType, error) {
 			s.description,
 		FROM schedulel_type s
 	`
-	schedules, err := Query(p, query, mapRowToScheduleType)
+	schedules, err := Query(dbc, query, mapRowToScheduleType)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query db. %w", err)
 	}
@@ -24,7 +24,7 @@ func (p *Postgres) GetScheduleTypes() ([]*models.ScheduleType, error) {
 }
 
 // GetSchedule get the schedule with name from the db.
-func (p *Postgres) GetScheduleType(name string) ([]*models.ScheduleType, error) {
+func (dbc *DatabaseConnection) GetScheduleTypeByName(name string) ([]*models.ScheduleType, error) {
 	query := `
 		SELECT 
 			s.id,
@@ -33,7 +33,7 @@ func (p *Postgres) GetScheduleType(name string) ([]*models.ScheduleType, error) 
 		FROM schedule_type s
 		WHERE s.name = $1
 	`
-	schedules, err := Query(p, query, mapRowToScheduleType, name)
+	schedules, err := Query(dbc, query, mapRowToScheduleType, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query db. %w", err)
 	}
@@ -41,26 +41,43 @@ func (p *Postgres) GetScheduleType(name string) ([]*models.ScheduleType, error) 
 	return schedules, nil
 }
 
+// NewSchedule creates a new schedule.
+func (dbc *DatabaseConnection) NewScheduleType(name, description string) error {
+	query := `
+		INSERT INTO schedule_type (name, description)
+		VALUES ($1, $2)
+	`
+
+	args := []any{name, description}
+
+	err := Execute(dbc, query, args...)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // UpdateScheduleType updates a schedule type.
-func (p *Postgres) UpdateScheduleType(name string, newSchedule *models.ScheduleType) error {
+func (dbc *DatabaseConnection) UpdateScheduleType(name string, newSchedule *models.ScheduleType) error {
 	query := `
 	UPDATE schedule_type s
 	WHERE s.name = $1
 	SET p.name = $2
 	SET p.description = $3
 	`
-	_, err := Query(p, query, mapRowToScheduleType, name, newSchedule.Name, newSchedule.Description)
+	_, err := Query(dbc, query, mapRowToScheduleType, name, newSchedule.Name, newSchedule.Description)
 	return err
 }
 
 // DeleteScheduleType deletes a schedule type.
-func (p *Postgres) DeleteScheduleType(name string) error {
+func (dbc *DatabaseConnection) DeleteScheduleType(name string) error {
 	query := `
 		DELETE FROM schedule_type s
 		WHERE s.name = $1
 	`
 
-	_, err := Query(p, query, mapRowToShiftSchedule, name)
+	_, err := Query(dbc, query, mapRowToShiftSchedule, name)
 
 	return err
 }

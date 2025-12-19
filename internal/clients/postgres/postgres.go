@@ -2,12 +2,13 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/rs/zerolog"
+	"github.com/jackc/pgx/v5/pgconn"
+	_ "github.com/lib/pq"
 )
 
 var (
@@ -15,55 +16,50 @@ var (
 	ErrTableCreateFailed = errors.New("failed to create table")
 )
 
-func NewPostgresConfig(username, password, hostname string, port int, database string, tls bool) (*pgxpool.Config, error) {
+// PgxIface abstracts the pgxpool so we can mock pgx connections for testing.
+// The implementation has to match the pgxpool functionality that is available.
+type PgxIface interface {
+	Begin(context.Context) (pgx.Tx, error)
+	Exec(context.Context, string, ...any) (pgconn.CommandTag, error)
+	QueryRow(context.Context, string, ...any) pgx.Row
+	Query(context.Context, string, ...any) (pgx.Rows, error)
+	Ping(context.Context) error
+	Close()
+}
 
+func NewURL(username, password, hostname string, port int, database string, tls bool) string {
 	// urlExample := "postgres://username:password@localhost:5432/database_name"
 	url := fmt.Sprintf("postgres://%v:%v@%v:%d/%v", username, password, hostname, port, database)
-	config, err := pgxpool.ParseConfig(url)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse config from url %v. %w", url, err)
-	}
-	if !tls {
-		config.ConnConfig.TLSConfig = nil
-	}
-	return config, nil
+	return url
 }
 
-type Postgres struct {
-	Ctx  context.Context
-	Pool *pgxpool.Pool
+type DatabaseConnection struct {
+	Ctx context.Context
+	DB  *sql.DB
 }
 
-func Init(ctx context.Context, config *pgxpool.Config) (*Postgres, error) {
-
-	logger := zerolog.Ctx(ctx)
-
-	if config == nil {
-		return nil, ErrMissingConfig
-	}
-
-	pool, err := pgxpool.NewWithConfig(context.Background(), config)
+func Init(ctx context.Context, url string) (*DatabaseConnection, error) {
+	db, err := sql.Open("postgres", url)
 	if err != nil {
-		return nil, fmt.Errorf("unable to connect to database: %w", err)
+		return nil, err
 	}
-	pg := Postgres{
-		Ctx:  ctx,
-		Pool: pool,
+	connection := DatabaseConnection{
+		Ctx: ctx,
+		DB:  db,
 	}
-	logger.Info().Msg("connected to postgres")
 
-	err = pg.CreateTables()
+	err = connection.DB.Ping()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create tables: %w", err)
+		return nil, err
 	}
-	logger.Info().Msg("verified tables exist")
 
-	return &pg, nil
+	return &connection, nil
 }
 
 // Query is a generic implementation where the goal was to avoid most of the boilerplating with querying.
-func Query[T any](p *Postgres, query string, rowMapper func(pgx.Rows) (T, error), args ...any) ([]T, error) {
-	rows, err := p.Pool.Query(p.Ctx, query, args...)
+// Query is where you expect row(s) in return, for example a SELECT statement.
+func Query[T any](dbc *DatabaseConnection, query string, rowMapper func(*sql.Rows) (T, error), args ...any) ([]T, error) {
+	rows, err := dbc.DB.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -85,23 +81,38 @@ func Query[T any](p *Postgres, query string, rowMapper func(pgx.Rows) (T, error)
 	return results, nil
 }
 
-func (p *Postgres) Execute(table string, args ...any) error {
+// Execute is where no rows are to be returned, for example INSERT and UPDATE statements.
+func Execute(dbc *DatabaseConnection, query string, args ...any) error {
 
-	tx, err := p.Pool.Begin(p.Ctx)
+	tx, err := dbc.DB.BeginTx(dbc.Ctx, nil)
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(p.Ctx)
+	defer tx.Rollback()
 
-	_, err = tx.Exec(p.Ctx, table, args...)
+	_, err = tx.ExecContext(dbc.Ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("failed executing: %w", err)
 	}
 
-	err = tx.Commit(p.Ctx)
+	err = tx.Commit()
 	if err != nil {
 		return fmt.Errorf("failed commiting: %w", err)
 	}
 
 	return nil
+}
+
+func SetupDB(ctx context.Context, url string) (*DatabaseConnection, error) {
+	connection, err := Init(ctx, url)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize database: %w", err)
+	}
+
+	err = connection.CreateTables()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create/verify necessary tables in database: %w", err)
+	}
+
+	return connection, nil
 }

@@ -5,6 +5,9 @@ import (
 	"net/http"
 )
 
-func Ping(w http.ResponseWriter, r *http.Request) {
+type HealthCheckHandler struct {
+}
+
+func (h *HealthCheckHandler) Ping(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"message": "pong"})
 }

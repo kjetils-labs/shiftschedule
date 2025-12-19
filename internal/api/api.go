@@ -15,10 +15,10 @@ import (
 	"github.com/shiftschedule/internal/clients/postgres"
 )
 
-func StartListening(ctx context.Context, pg *postgres.Postgres, address string) {
+func StartListening(ctx context.Context, dbc *postgres.DatabaseConnection, address string) {
 
 	logger := zerolog.Ctx(ctx)
-	srv, err := InitHttpServer(ctx, pg, address)
+	srv, err := InitHttpServer(ctx, dbc, address)
 
 	go func() {
 		logger.Info().Ctx(ctx).Str("address", srv.Addr).Msg("starting api")
@@ -45,7 +45,7 @@ func StartListening(ctx context.Context, pg *postgres.Postgres, address string) 
 	logger.Info().Ctx(ctx).Msg("server shutdown gracefully")
 }
 
-func InitHttpServer(ctx context.Context, pg *postgres.Postgres, address string) (*http.Server, error) {
+func InitHttpServer(ctx context.Context, dbc *postgres.DatabaseConnection, address string) (*http.Server, error) {
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
@@ -53,7 +53,7 @@ func InitHttpServer(ctx context.Context, pg *postgres.Postgres, address string) 
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
-	setupRoutes(r)
+	setupRoutes(ctx, r, dbc)
 	srv := &http.Server{
 		Handler: r,
 		Addr:    address,
@@ -62,49 +62,58 @@ func InitHttpServer(ctx context.Context, pg *postgres.Postgres, address string) 
 	return srv, nil
 }
 
-func setupRoutes(r *chi.Mux) error {
+func setupRoutes(ctx context.Context, r *chi.Mux, dbc *postgres.DatabaseConnection) error {
 
 	r.Route("/v1", func(r chi.Router) {
-		setupPersonnel(r)
-		setupSchedule(r)
-		setupScheduleType(r)
+		setupHealthcheck(r)
+		setupPersonnel(ctx, dbc, r)
+		setupSchedule(ctx, dbc, r)
+		setupScheduleType(ctx, dbc, r)
 	})
 
 	return nil
 }
 
-func setupPersonnel(r chi.Router) {
-	personnel := routes.PersonnelHandler{}
+func setupPersonnel(ctx context.Context, dbc *postgres.DatabaseConnection, r chi.Router) {
+	handler := routes.PersonnelHandler{Ctx: ctx, Dbc: dbc}
 
 	r.Route("/personnel", func(r chi.Router) {
-		r.Get("/", personnel.GetPersonnelAll)
-		r.Get("/{name}", personnel.GetPersonnelByName)
-		r.Post("/", personnel.NewPersonnel)
-		r.Patch("{id}", personnel.UpdatePersonnel)
-		r.Delete("/{id}", personnel.DeletePersonnel)
+		r.Get("/", handler.GetPersonnelAll)
+		r.Get("/{name}", handler.GetPersonnelByName)
+		r.Post("/", handler.NewPersonnel)
+		r.Patch("{id}", handler.UpdatePersonnel)
+		r.Delete("/{id}", handler.DeletePersonnelByName)
 	})
 }
 
-func setupSchedule(r chi.Router) {
-	schedule := routes.ScheduleHandler{}
+func setupSchedule(ctx context.Context, dbc *postgres.DatabaseConnection, r chi.Router) {
+	handler := routes.ScheduleHandler{Ctx: ctx, Dbc: dbc}
 
 	r.Route("/schedule", func(r chi.Router) {
-		r.Get("/", wrap(schedule.GetScheduleAll))
-		r.Get("/{name}", wrap(schedule.GetScheduleByName))
-		r.Post("/", wrap(schedule.NewSchedule))
-		r.Patch("/{id}", wrap(schedule.UpdateSchedule))
-		r.Delete("/{id}", wrap(schedule.DeleteSchedule))
+		r.Get("/", handler.GetScheduleAll)
+		r.Get("/{name}", handler.GetScheduleByName)
+		r.Post("/", handler.NewSchedule)
+		r.Patch("/{id}", handler.UpdateSchedule)
+		r.Delete("/{id}", handler.DeleteScheduleByName)
 	})
 }
 
-func setupScheduleType(r chi.Router) {
-	scheduleType := routes.ScheduleTypeHandler{}
+func setupScheduleType(ctx context.Context, dbc *postgres.DatabaseConnection, r chi.Router) {
+	handler := routes.ScheduleTypeHandler{Ctx: ctx, Dbc: dbc}
 
 	r.Route("/scheduletype", func(r chi.Router) {
-		r.Get("/", wrap(scheduleType.GetScheduleTypeAll))
-		r.Get("/{name}", wrap(scheduleType.GetScheduleTypeByName))
-		r.Post("/", wrap(scheduleType.NewScheduleType))
-		r.Patch("/{id}", wrap(scheduleType.UpdateScheduleType))
-		r.Delete("/{id}", wrap(scheduleType.DeleteScheduleType))
+		r.Get("/", handler.GetScheduleTypeAll)
+		r.Get("/{name}", handler.GetScheduleTypeByName)
+		r.Post("/", handler.NewScheduleType)
+		r.Patch("/{id}", handler.UpdateScheduleType)
+		r.Delete("/{id}", handler.DeleteScheduleTypeByName)
+	})
+}
+
+func setupHealthcheck(r chi.Router) {
+	handler := routes.HealthCheckHandler{}
+
+	r.Route("/scheduletype", func(r chi.Router) {
+		r.Get("/ping", handler.Ping)
 	})
 }
