@@ -1,0 +1,112 @@
+version: "3"
+
+# Variables from .env (POSTGRES_*, AUTH_MODE, ...) are passed on to every command.
+dotenv: [".env"]
+
+vars:
+  SWAG_VERSION: v1.16.4
+
+tasks:
+  default:
+    desc: List the available tasks
+    silent: true
+    cmds:
+      - task --list
+
+  # Run
+
+  run:
+    desc: Run the API (migrations run on startup)
+    cmds:
+      - go run ./cmd/shiftschedule
+
+  seed:
+    desc: Fill the database with development data (AUTH_MODE=dev only)
+    cmds:
+      - go run ./cmd/generator
+
+  dex:config:
+    desc: Regenerate hacks/dex/config.yaml from the development people in internal/devdata
+    cmds:
+      - go run ./cmd/generator -dex-config hacks/dex/config.yaml
+
+  # Build and check
+
+  build:
+    desc: Build the binaries into ./bin
+    cmds:
+      - go build -o bin/shiftschedule ./cmd/shiftschedule
+      - go build -o bin/generator ./cmd/generator
+
+  fmt:
+    desc: Format the Go code
+    cmds:
+      - gofmt -w cmd internal
+
+  vet:
+    desc: Run go vet
+    cmds:
+      - go vet ./...
+
+  lint:
+    desc: Run golangci-lint
+    cmds:
+      - golangci-lint run ./...
+
+  tidy:
+    desc: Tidy go.mod and go.sum
+    cmds:
+      - go mod tidy
+
+  test:
+    desc: Run the tests (needs Postgres; TEST_DATABASE_URL defaults to the one in .env, database tests are skipped without any)
+    cmds:
+      - >-
+        TEST_DATABASE_URL="${TEST_DATABASE_URL:-postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST:-127.0.0.1}:${POSTGRES_PORT:-5432}/postgres?sslmode=disable}"
+        go test ./... {{.CLI_ARGS}}
+
+  check:
+    desc: Format, vet and test
+    cmds:
+      - task: fmt
+      - task: vet
+      - task: test
+
+  # API docs
+
+  swag:
+    desc: Regenerate the Swagger docs in internal/api/swagger (go generate)
+    cmds:
+      - go generate ./internal/api
+
+  swag:install:
+    desc: Install the swag CLI used by the swag task
+    cmds:
+      - go install github.com/swaggo/swag/cmd/swag@{{.SWAG_VERSION}}
+
+  # Local services
+
+  up:
+    desc: Start Postgres, Dex and pgAdmin
+    cmds:
+      - docker compose up -d
+
+  up:db:
+    desc: Start only Postgres
+    cmds:
+      - docker compose up -d postgres
+
+  up:dex:
+    desc: Start only Dex
+    cmds:
+      - docker compose up -d dex
+
+  down:
+    desc: Stop the local services (data is kept)
+    cmds:
+      - docker compose down
+
+  logs:
+    desc: Follow the logs of the local services, e.g. task logs -- dex
+    cmds:
+      - docker compose logs -f {{.CLI_ARGS}}
