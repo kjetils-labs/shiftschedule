@@ -1,74 +1,62 @@
 package config_test
 
 import (
-	"errors"
-	"fmt"
-	"io"
-	"io/fs"
-	"os"
 	"testing"
 
 	"github.com/shiftschedule/internal/config"
-	"github.com/shiftschedule/internal/helpers/path"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestInit(t *testing.T) {
-
-	err := verifyEnv(t)
-	require.Nil(t, err)
-
-	config, err := config.Init()
-	require.Nil(t, err)
-
-	assert.NotNil(t, config)
-
-	assert.NotEmpty(t, config.PostgresUsername, "username cannot be empty")
-	assert.NotEmpty(t, config.PostgresPassword, "password cannot be empty")
-	assert.NotEmpty(t, config.PostgresDatabase, "database cannot be empty")
-	assert.NotEmpty(t, config.PostgresHostname, "hostname cannot be empty")
-	assert.NotEmpty(t, config.PostgresPort, "port cannot be empty")
-
+func setRequired(t *testing.T) {
+	t.Helper()
+	t.Chdir(t.TempDir()) // keeps a developer's .env out of the tests
+	t.Setenv("POSTGRES_HOST", "db.example")
+	t.Setenv("POSTGRES_USER", "user")
+	t.Setenv("POSTGRES_PASSWORD", "secret")
+	t.Setenv("POSTGRES_DB", "shifts")
 }
 
-func verifyEnv(t *testing.T) error {
+func TestInitFromEnvironmentWithDefaults(t *testing.T) {
+	setRequired(t)
+	t.Setenv("POSTGRES_PORT", "6543")
 
-	envFile := ".env"
-	file, err := path.FindFile(envFile)
-	require.Nil(t, err)
+	cfg, err := config.Init()
+	require.NoError(t, err)
 
-	_, err = os.ReadFile(file)
-	if err != nil {
-		t.Logf("failed to read .env. %v", err)
-	}
+	assert.Equal(t, "db.example", cfg.PostgresHostname)
+	assert.Equal(t, 6543, cfg.PostgresPort)
+	assert.Equal(t, config.AuthModeDev, cfg.AuthMode)
+	assert.Equal(t, 8080, cfg.APIPort)
 
-	switch {
-	case errors.Is(err, fs.ErrNotExist):
-		exampleFile := "./env.example"
-		file, err := path.FindFile(exampleFile)
-		example, err := os.Open(file)
-		if err != nil {
-			return fmt.Errorf("failed to stat env.example. %w", err)
-		}
+	loc, err := cfg.Location()
+	require.NoError(t, err)
+	assert.Equal(t, "Europe/Oslo", loc.String())
+}
 
-		defer func() { err = example.Close() }()
-		if err != nil {
-			return fmt.Errorf("failed to stat env.example. %w", err)
-		}
+func TestInitRejectsInvalidValues(t *testing.T) {
+	setRequired(t)
+	t.Setenv("AUTH_MODE", "magic")
+	t.Setenv("TIMEZONE", "Mars/Olympus")
 
-		newEnv, err := os.Create(envFile)
-		if err != nil {
-			return fmt.Errorf("failed to create new .env file. %w", err)
-		}
-		_, err = io.Copy(example, newEnv)
-		if err != nil {
-			return fmt.Errorf("failed to copy data to .env file. %w", err)
-		}
+	_, err := config.Init()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "AUTH_MODE")
+	assert.Contains(t, err.Error(), "TIMEZONE")
+}
 
-	default:
-		return err
-	}
+func TestInitRequiresIssuerAndClientForOIDC(t *testing.T) {
+	setRequired(t)
+	t.Setenv("AUTH_MODE", "oidc")
 
-	return nil
+	_, err := config.Init()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "OIDC_ISSUER_URL")
+	assert.Contains(t, err.Error(), "OIDC_CLIENT_ID")
+
+	t.Setenv("OIDC_ISSUER_URL", "http://127.0.0.1:5556/dex")
+	t.Setenv("OIDC_CLIENT_ID", "shiftschedule-web")
+	cfg, err := config.Init()
+	require.NoError(t, err)
+	assert.Equal(t, "http://127.0.0.1:5556/dex", cfg.OIDCIssuerURL)
 }
