@@ -1,3 +1,4 @@
+// Package httpsuite provides a generic HTTP response type and helper functions for sending JSON responses in a consistent format.
 package httpsuite
 
 import (
@@ -14,9 +15,9 @@ import (
 
 // Response represents the structure of an HTTP response, including a status code, message, and optional body.
 type Response[T any] struct {
-	Code    int    `json:"code"`
+	Body    *T     `json:"body,omitempty"`
 	Message string `json:"message"`
-	Body    T      `json:"body,omitempty"`
+	Code    int    `json:"code"`
 }
 
 type emptyResponse struct{}
@@ -30,7 +31,7 @@ func GetEmptyResponse() *emptyResponse {
 func (r *Response[T]) Marshal() ([]byte, error) {
 	jsonResponse, err := json.Marshal(r)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal response: %v", err)
+		return nil, fmt.Errorf("failed to marshal response: %w", err)
 	}
 
 	return jsonResponse, nil
@@ -43,9 +44,7 @@ func SendResponse[T any](ctx context.Context, w http.ResponseWriter, message str
 		Code:    code,
 		Message: message,
 	}
-	if body != nil {
-		response.Body = *body
-	}
+	response.Body = body
 
 	writeJSONResponse(ctx, w, response)
 }
