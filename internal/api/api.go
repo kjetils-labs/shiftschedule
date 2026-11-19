@@ -1,9 +1,11 @@
+// Package api sets up the HTTP server and routes.
 package api
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net/http"
-	"os"
 	"os/signal"
 	"syscall"
 	"time"
@@ -11,109 +13,114 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/rs/zerolog"
-	"github.com/shiftschedule/internal/api/routes"
-	"github.com/shiftschedule/internal/clients/postgres"
+	_ "github.com/shiftschedule/internal/api/swagger" // registers the generated spec
+	"github.com/shiftschedule/internal/auth"
+	"github.com/shiftschedule/internal/service"
+	httpSwagger "github.com/swaggo/http-swagger/v2"
 )
 
-func StartListening(ctx context.Context, dbc *postgres.DatabaseConnection, address string) {
+const (
+	shutdownTimeout   = 5 * time.Second
+	readHeaderTimeout = 5 * time.Second
+)
 
-	logger := zerolog.Ctx(ctx)
-	srv, err := InitHttpServer(ctx, dbc, address)
+//go:generate swag init -g internal/api/api.go -d ../.. --exclude node_modules,web,hacks,docs -o swagger --parseInternal --parseDependency --useStructName --outputTypes go,json,yaml
 
-	go func() {
-		logger.Info().Ctx(ctx).Str("address", srv.Addr).Msg("starting api")
-		err := srv.ListenAndServe()
-		if err != nil {
-			logger.Error().Ctx(ctx).Err(err).Send()
-		}
-	}()
+//	@title			Shift schedule API
+//	@version		1.0
+//	@description	Who has which shift. A week runs Monday 08:00 to Monday 08:00 (Europe/Oslo): day shifts are 08:00-15:30 and on-call 15:30-08:00 the day after.
+//	@BasePath		/v1
+//
+//	@securityDefinitions.apikey	BearerAuth
+//	@in							header
+//	@name						Authorization
+//	@description				AUTH_MODE=oidc: "Bearer <ID token from Dex>".
+//
+//	@securityDefinitions.apikey	DevUser
+//	@in							header
+//	@name						X-Dev-User
+//	@description				AUTH_MODE=dev only: the email of the person to act as.
 
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-
-	<-quit
-	logger.Info().Ctx(ctx).Msg("shutdown signal receieved")
-
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-
-	err = srv.Shutdown(ctx)
-	if err != nil {
-		logger.Error().Ctx(ctx).Err(err).Msg("server forced to shutdown")
-	}
-
-	logger.Info().Ctx(ctx).Msg("server shutdown gracefully")
+// Handler holds the dependencies of the HTTP handlers.
+type Handler struct {
+	svc    *service.Service
+	auth   auth.Authenticator
+	logger zerolog.Logger
 }
 
-func InitHttpServer(ctx context.Context, dbc *postgres.DatabaseConnection, address string) (*http.Server, error) {
+// NewHandler creates the HTTP handlers.
+func NewHandler(logger zerolog.Logger, svc *service.Service, authenticator auth.Authenticator) *Handler {
+	return &Handler{svc: svc, auth: authenticator, logger: logger}
+}
 
+// Routes returns the router with all routes under /v1.
+func (h *Handler) Routes() http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
-	r.Use(middleware.RealIP)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
-	setupRoutes(ctx, r, dbc)
-	srv := &http.Server{
-		Handler: r,
-		Addr:    address,
-	}
-
-	return srv, nil
-}
-
-func setupRoutes(ctx context.Context, r *chi.Mux, dbc *postgres.DatabaseConnection) error {
+	r.Get("/swagger", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/swagger/index.html", http.StatusMovedPermanently)
+	})
+	r.Get("/swagger/*", httpSwagger.Handler(httpSwagger.URL("/swagger/doc.json")))
 
 	r.Route("/v1", func(r chi.Router) {
-		setupHealthcheck(r)
-		setupPersonnel(ctx, dbc, r)
-		setupSchedule(ctx, dbc, r)
-		setupScheduleType(ctx, dbc, r)
+		r.Get("/ping", h.Ping)
+
+		r.Group(func(r chi.Router) {
+			r.Use(h.authenticate)
+
+			r.Get("/me", h.Me)
+			r.Get("/me/schedule", h.MySchedule)
+			r.Get("/schedules/overview", h.Overview)
+			r.Get("/positions", h.Positions)
+			r.Post("/covers", h.CreateCover)
+			r.Delete("/covers/{id}", h.DeleteCover)
+			r.Put("/assignments", h.SetAssignment)
+
+			r.Route("/admin", func(r chi.Router) {
+				r.Use(h.requireAdmin)
+
+				r.Get("/personnel", h.ListPersonnel)
+				r.Post("/personnel", h.CreatePersonnel)
+				r.Post("/rotations", h.GenerateRotation)
+				r.Put("/red-days/{date}", h.SetRedDay)
+				r.Delete("/red-days/{date}", h.DeleteRedDay)
+			})
+		})
 	})
 
+	return r
+}
+
+// Serve listens on address until SIGINT/SIGTERM, then shuts down gracefully.
+func Serve(ctx context.Context, logger zerolog.Logger, handler http.Handler, address string) error {
+	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	srv := &http.Server{Addr: address, Handler: handler, ReadHeaderTimeout: readHeaderTimeout}
+
+	errCh := make(chan error, 1)
+	go func() {
+		logger.Info().Str("address", srv.Addr).Msg("starting api")
+		errCh <- srv.ListenAndServe()
+	}()
+
+	select {
+	case err := <-errCh:
+		return fmt.Errorf("server stopped: %w", err)
+	case <-ctx.Done():
+		logger.Info().Msg("shutdown signal received")
+	}
+
+	shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), shutdownTimeout)
+	defer cancel()
+
+	if err := srv.Shutdown(shutdownCtx); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		return fmt.Errorf("server forced to shutdown: %w", err)
+	}
+
+	logger.Info().Msg("server shutdown gracefully")
 	return nil
-}
-
-func setupPersonnel(ctx context.Context, dbc *postgres.DatabaseConnection, r chi.Router) {
-	handler := routes.PersonnelHandler{Ctx: ctx, Dbc: dbc}
-
-	r.Route("/personnel", func(r chi.Router) {
-		r.Get("/", handler.GetPersonnelAll)
-		r.Get("/{name}", handler.GetPersonnelByName)
-		r.Post("/", handler.NewPersonnel)
-		r.Patch("{id}", handler.UpdatePersonnel)
-		r.Delete("/{id}", handler.DeletePersonnelByName)
-	})
-}
-
-func setupSchedule(ctx context.Context, dbc *postgres.DatabaseConnection, r chi.Router) {
-	handler := routes.ScheduleHandler{Ctx: ctx, Dbc: dbc}
-
-	r.Route("/schedule", func(r chi.Router) {
-		r.Get("/", handler.GetScheduleAll)
-		r.Get("/{name}", handler.GetScheduleByName)
-		r.Post("/", handler.NewSchedule)
-		r.Patch("/{id}", handler.UpdateSchedule)
-		r.Delete("/{id}", handler.DeleteScheduleByName)
-	})
-}
-
-func setupScheduleType(ctx context.Context, dbc *postgres.DatabaseConnection, r chi.Router) {
-	handler := routes.ScheduleTypeHandler{Ctx: ctx, Dbc: dbc}
-
-	r.Route("/scheduletype", func(r chi.Router) {
-		r.Get("/", handler.GetScheduleTypeAll)
-		r.Get("/{name}", handler.GetScheduleTypeByName)
-		r.Post("/", handler.NewScheduleType)
-		r.Patch("/{id}", handler.UpdateScheduleType)
-		r.Delete("/{id}", handler.DeleteScheduleTypeByName)
-	})
-}
-
-func setupHealthcheck(r chi.Router) {
-	handler := routes.HealthCheckHandler{}
-
-	r.Route("/scheduletype", func(r chi.Router) {
-		r.Get("/ping", handler.Ping)
-	})
 }
