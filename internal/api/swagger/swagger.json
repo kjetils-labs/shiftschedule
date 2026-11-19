@@ -1,0 +1,1118 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "Who has which shift. A week runs Monday 08:00 to Monday 08:00 (Europe/Oslo): day shifts are 08:00-15:30 and on-call 15:30-08:00 the day after.",
+        "title": "Shift schedule API",
+        "contact": {},
+        "version": "1.0"
+    },
+    "basePath": "/v1",
+    "paths": {
+        "/admin/personnel": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    },
+                    {
+                        "DevUser": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "List personnel",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-array_Personnel"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Admins only",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    },
+                    {
+                        "DevUser": []
+                    }
+                ],
+                "description": "People are matched to their login by email. Their groups decide which teams they are in.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Register a person",
+                "parameters": [
+                    {
+                        "description": "The person",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/createPersonnelRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/Response-github_com_shiftschedule_internal_domain_Personnel"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Admins only",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/red-days/{date}": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    },
+                    {
+                        "DevUser": []
+                    }
+                ],
+                "description": "Overrides the weekends and the computed Norwegian public holidays. Red days have no day shift left to cover.",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Override whether a date is a red day",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "2026-12-24",
+                        "description": "Date (YYYY-MM-DD)",
+                        "name": "date",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "The override",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/setRedDayRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Admins only",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    },
+                    {
+                        "DevUser": []
+                    }
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Remove a red day override",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "2026-12-24",
+                        "description": "Date (YYYY-MM-DD)",
+                        "name": "date",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Admins only",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/rotations": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    },
+                    {
+                        "DevUser": []
+                    }
+                ],
+                "description": "Rotates each position through its team's members in alphabetical order, one week at a time. Weeks that already have an assignee are left alone.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Generate a year of rotations",
+                "parameters": [
+                    {
+                        "description": "The year",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/generateRotationRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Number of assignments created",
+                        "schema": {
+                            "$ref": "#/definitions/Response-internal_api_RotationResult"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Admins only",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/assignments": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    },
+                    {
+                        "DevUser": []
+                    }
+                ],
+                "description": "A null `assignee_id` leaves the week unfilled. The assignee must be a member of the position's team. Admins and the team manager only.",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "assignments"
+                ],
+                "summary": "Set who holds a position for a week",
+                "parameters": [
+                    {
+                        "description": "The assignment",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/setAssignmentRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/covers": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    },
+                    {
+                        "DevUser": []
+                    }
+                ],
+                "description": "Hand a position over to a team member for the rest of the day (only for the current week) or for the whole week. Allowed for the assignee, the team manager and admins. `week_start` (Monday, YYYY-MM-DD) is optional and defaults to the current week. Cover across teams is not allowed.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "covers"
+                ],
+                "summary": "Cover a position",
+                "parameters": [
+                    {
+                        "description": "The cover",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/createCoverRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/Response-CoverView"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request, or the coverer is not in the team",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Overlapping cover, nothing left of the shift today, or the week has passed",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/covers/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    },
+                    {
+                        "DevUser": []
+                    }
+                ],
+                "description": "Allowed for the assignee, the person covering, the team manager and admins.",
+                "tags": [
+                    "covers"
+                ],
+                "summary": "Remove a cover",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Cover id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/me": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    },
+                    {
+                        "DevUser": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "me"
+                ],
+                "summary": "The signed-in person",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-github_com_shiftschedule_internal_domain_Personnel"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Signed in, but not registered as personnel",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Identity provider unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/me/schedule": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    },
+                    {
+                        "DevUser": []
+                    }
+                ],
+                "description": "Previous, current, next and my next week for every position of the teams I am a member of. Weeks run Monday 08:00 to Monday 08:00 (Europe/Oslo). `is_me` marks the weeks and covers I am part of. An empty list means I have no positions.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "me"
+                ],
+                "summary": "My schedules",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-array_github_com_shiftschedule_internal_service_PositionSchedule"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/ping": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "system"
+                ],
+                "summary": "Liveness check",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-internal_api_PingResult"
+                        }
+                    }
+                }
+            }
+        },
+        "/positions": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    },
+                    {
+                        "DevUser": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "schedules"
+                ],
+                "summary": "List positions",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-array_Position"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/schedules/overview": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    },
+                    {
+                        "DevUser": []
+                    }
+                ],
+                "description": "Day shifts (08:00-15:30) and on-call shifts (15:30-08:00) with the previous, current and next person, plus my next shift where I take part. The other kind is left empty when `kind` is given.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "schedules"
+                ],
+                "summary": "Overview of all shifts",
+                "parameters": [
+                    {
+                        "enum": [
+                            "day_shift",
+                            "on_call"
+                        ],
+                        "type": "string",
+                        "description": "Only this kind of shift",
+                        "name": "kind",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-github_com_shiftschedule_internal_service_Overview"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/ErrorResponse"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "CoverView": {
+            "type": "object",
+            "properties": {
+                "covered_by": {
+                    "$ref": "#/definitions/PersonRef"
+                },
+                "ends_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "is_me": {
+                    "type": "boolean"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "starts_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 403
+                },
+                "message": {
+                    "type": "string",
+                    "example": "forbidden"
+                }
+            }
+        },
+        "Overview": {
+            "type": "object",
+            "properties": {
+                "day_shift": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/PositionSchedule"
+                    }
+                },
+                "on_call": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/PositionSchedule"
+                    }
+                }
+            }
+        },
+        "PersonRef": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "Personnel": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "groups": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "is_admin": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "PingResult": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string",
+                    "example": "pong"
+                }
+            }
+        },
+        "Position": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "kind": {
+                    "$ref": "#/definitions/ShiftKind"
+                },
+                "manager_id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "team_id": {
+                    "type": "integer"
+                },
+                "team_name": {
+                    "type": "string"
+                }
+            }
+        },
+        "PositionSchedule": {
+            "type": "object",
+            "properties": {
+                "current": {
+                    "$ref": "#/definitions/WeekView"
+                },
+                "my_next": {
+                    "$ref": "#/definitions/WeekView"
+                },
+                "my_next_cover": {
+                    "$ref": "#/definitions/UpcomingCover"
+                },
+                "next": {
+                    "$ref": "#/definitions/WeekView"
+                },
+                "position": {
+                    "$ref": "#/definitions/Position"
+                },
+                "previous": {
+                    "$ref": "#/definitions/WeekView"
+                }
+            }
+        },
+        "Response-CoverView": {
+            "type": "object",
+            "properties": {
+                "body": {
+                    "$ref": "#/definitions/CoverView"
+                },
+                "code": {
+                    "type": "integer"
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "Response-array_Personnel": {
+            "type": "object",
+            "properties": {
+                "body": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/Personnel"
+                    }
+                },
+                "code": {
+                    "type": "integer"
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "Response-array_Position": {
+            "type": "object",
+            "properties": {
+                "body": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/Position"
+                    }
+                },
+                "code": {
+                    "type": "integer"
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "Response-array_github_com_shiftschedule_internal_service_PositionSchedule": {
+            "type": "object",
+            "properties": {
+                "body": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/PositionSchedule"
+                    }
+                },
+                "code": {
+                    "type": "integer"
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "Response-github_com_shiftschedule_internal_domain_Personnel": {
+            "type": "object",
+            "properties": {
+                "body": {
+                    "$ref": "#/definitions/Personnel"
+                },
+                "code": {
+                    "type": "integer"
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "Response-github_com_shiftschedule_internal_service_Overview": {
+            "type": "object",
+            "properties": {
+                "body": {
+                    "$ref": "#/definitions/Overview"
+                },
+                "code": {
+                    "type": "integer"
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "Response-internal_api_PingResult": {
+            "type": "object",
+            "properties": {
+                "body": {
+                    "$ref": "#/definitions/PingResult"
+                },
+                "code": {
+                    "type": "integer"
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "Response-internal_api_RotationResult": {
+            "type": "object",
+            "properties": {
+                "body": {
+                    "$ref": "#/definitions/RotationResult"
+                },
+                "code": {
+                    "type": "integer"
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "RotationResult": {
+            "type": "object",
+            "properties": {
+                "created": {
+                    "type": "integer"
+                }
+            }
+        },
+        "ShiftKind": {
+            "type": "string",
+            "enum": [
+                "day_shift",
+                "on_call"
+            ],
+            "x-enum-varnames": [
+                "KindDayShift",
+                "KindOnCall"
+            ]
+        },
+        "UpcomingCover": {
+            "type": "object",
+            "properties": {
+                "cover": {
+                    "$ref": "#/definitions/CoverView"
+                },
+                "week_start": {
+                    "type": "string"
+                }
+            }
+        },
+        "WeekView": {
+            "type": "object",
+            "properties": {
+                "assignee": {
+                    "$ref": "#/definitions/PersonRef"
+                },
+                "covers": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/CoverView"
+                    }
+                },
+                "ends_at": {
+                    "type": "string"
+                },
+                "holder": {
+                    "$ref": "#/definitions/PersonRef"
+                },
+                "is_me": {
+                    "type": "boolean"
+                },
+                "starts_at": {
+                    "type": "string"
+                },
+                "week_start": {
+                    "type": "string"
+                }
+            }
+        },
+        "createCoverRequest": {
+            "type": "object",
+            "required": [
+                "covered_by",
+                "position_id",
+                "scope"
+            ],
+            "properties": {
+                "covered_by": {
+                    "type": "integer"
+                },
+                "position_id": {
+                    "type": "integer"
+                },
+                "reason": {
+                    "type": "string",
+                    "maxLength": 500
+                },
+                "scope": {
+                    "type": "string",
+                    "enum": [
+                        "rest_of_day",
+                        "whole_week"
+                    ]
+                },
+                "week_start": {
+                    "type": "string",
+                    "example": "2026-11-16"
+                }
+            }
+        },
+        "createPersonnelRequest": {
+            "type": "object",
+            "required": [
+                "email",
+                "groups",
+                "name"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string",
+                    "example": "nina@example.com"
+                },
+                "groups": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "alpha"
+                    ]
+                },
+                "is_admin": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "example": "Nina Berg"
+                }
+            }
+        },
+        "generateRotationRequest": {
+            "type": "object",
+            "required": [
+                "year"
+            ],
+            "properties": {
+                "year": {
+                    "type": "integer",
+                    "maximum": 2200,
+                    "minimum": 2000,
+                    "example": 2027
+                }
+            }
+        },
+        "setAssignmentRequest": {
+            "type": "object",
+            "required": [
+                "position_id",
+                "week_start"
+            ],
+            "properties": {
+                "assignee_id": {
+                    "type": "integer"
+                },
+                "position_id": {
+                    "type": "integer"
+                },
+                "week_start": {
+                    "type": "string",
+                    "example": "2026-11-16"
+                }
+            }
+        },
+        "setRedDayRequest": {
+            "type": "object",
+            "properties": {
+                "is_red_day": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "example": "Company day"
+                }
+            }
+        }
+    },
+    "securityDefinitions": {
+        "BearerAuth": {
+            "description": "AUTH_MODE=oidc: \"Bearer \u003cID token from Dex\u003e\".",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        },
+        "DevUser": {
+            "description": "AUTH_MODE=dev only: the email of the person to act as.",
+            "type": "apiKey",
+            "name": "X-Dev-User",
+            "in": "header"
+        }
+    }
+}
