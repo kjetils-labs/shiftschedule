@@ -1,3 +1,4 @@
+// Package logging provides a wrapper around the zerolog package to provide a more convenient interface for logging in the application.
 package logging
 
 import (
