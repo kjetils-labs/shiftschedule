@@ -1,105 +1,113 @@
+// Package postgres is the pgx based persistence layer. Schema changes live in migrations/ and are applied with goose.
 package postgres
 
 import (
 	"context"
-	"database/sql"
+	"embed"
 	"errors"
 	"fmt"
+	"io/fs"
+	"net"
+	"net/url"
+	"strconv"
 
-	_ "github.com/lib/pq"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/stdlib"
+	"github.com/pressly/goose/v3"
+	"github.com/shiftschedule/internal/domain"
 )
 
-var (
-	ErrMissingConfig     = errors.New("missing config")
-	ErrTableCreateFailed = errors.New("failed to create table")
+//go:embed migrations/*.sql
+var migrations embed.FS
+
+const (
+	pgExclusionViolation  = "23P01"
+	pgUniqueViolation     = "23505"
+	pgForeignKeyViolation = "23503"
 )
 
+// NewURL builds a connection URL, escaping credentials.
 func NewURL(username, password, hostname string, port int, database string, tls bool) string {
-	// urlExample := "postgres://username:password@localhost:5432/database_name"
-	url := fmt.Sprintf("postgres://%v:%v@%v:%d/%v", username, password, hostname, port, database)
-	return url
+	sslmode := "disable"
+	if tls {
+		sslmode = "require"
+	}
+
+	u := url.URL{
+		Scheme:   "postgres",
+		User:     url.UserPassword(username, password),
+		Host:     net.JoinHostPort(hostname, strconv.Itoa(port)),
+		Path:     database,
+		RawQuery: url.Values{"sslmode": {sslmode}}.Encode(),
+	}
+	return u.String()
 }
 
-type DatabaseConnection struct {
-	Ctx context.Context
-	DB  *sql.DB
+// Store gives access to the database.
+type Store struct {
+	pool *pgxpool.Pool
 }
 
-func Init(ctx context.Context, url string) (*DatabaseConnection, error) {
-	db, err := sql.Open("postgres", url)
+// New connects to the database and verifies the connection.
+func New(ctx context.Context, connURL string) (*Store, error) {
+	pool, err := pgxpool.New(ctx, connURL)
 	if err != nil {
-		return nil, err
-	}
-	connection := DatabaseConnection{
-		Ctx: ctx,
-		DB:  db,
+		return nil, fmt.Errorf("failed to create pool: %w", err)
 	}
 
-	err = connection.DB.Ping()
-	if err != nil {
-		return nil, err
+	if err := pool.Ping(ctx); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	return &connection, nil
+	return &Store{pool: pool}, nil
 }
 
-// Query is a generic implementation where the goal was to avoid most of the boilerplating with querying.
-// Query is where you expect row(s) in return, for example a SELECT statement.
-func Query[T any](dbc *DatabaseConnection, query string, rowMapper func(*sql.Rows) (T, error), args ...any) ([]T, error) {
-	rows, err := dbc.DB.Query(query, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	results := []T{}
-	for rows.Next() {
-		item, err := rowMapper(rows)
-		if err != nil {
-			return results, fmt.Errorf("row scan failed: %w", err)
-		}
-		results = append(results, item)
-	}
-
-	if rows.Err() != nil {
-		return results, fmt.Errorf("rows error: %w", rows.Err())
-	}
-
-	return results, nil
+// NewFromPool wraps an existing pool, for example in tests.
+func NewFromPool(pool *pgxpool.Pool) *Store {
+	return &Store{pool: pool}
 }
 
-// Execute is where no rows are to be returned, for example INSERT and UPDATE statements.
-func Execute(dbc *DatabaseConnection, query string, args ...any) error {
+// Close releases all connections.
+func (s *Store) Close() {
+	s.pool.Close()
+}
 
-	tx, err := dbc.DB.BeginTx(dbc.Ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
+// Migrate applies all pending migrations.
+func (s *Store) Migrate(ctx context.Context) error {
+	db := stdlib.OpenDBFromPool(s.pool)
+	defer db.Close()
 
-	_, err = tx.ExecContext(dbc.Ctx, query, args...)
+	sub, err := fs.Sub(migrations, "migrations")
 	if err != nil {
-		return fmt.Errorf("failed executing: %w", err)
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		return fmt.Errorf("failed commiting: %w", err)
+		return fmt.Errorf("failed to open embedded migrations: %w", err)
 	}
 
+	provider, err := goose.NewProvider(goose.DialectPostgres, db, sub)
+	if err != nil {
+		return fmt.Errorf("failed to create migration provider: %w", err)
+	}
+
+	if _, err := provider.Up(ctx); err != nil {
+		return fmt.Errorf("failed to apply migrations: %w", err)
+	}
 	return nil
 }
 
-func SetupDB(ctx context.Context, url string) (*DatabaseConnection, error) {
-	connection, err := Init(ctx, url)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize database: %w", err)
+// mapError turns database errors into domain errors where the caller can act on them.
+func mapError(err error) error {
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) {
+		return err
 	}
 
-	err = connection.CreateTables()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create/verify necessary tables in database: %w", err)
+	switch pgErr.Code {
+	case pgExclusionViolation, pgUniqueViolation:
+		return fmt.Errorf("%w: %s", domain.ErrConflict, pgErr.Message)
+	case pgForeignKeyViolation:
+		return fmt.Errorf("%w: %s", domain.ErrInvalid, pgErr.Message)
+	default:
+		return err
 	}
-
-	return connection, nil
 }
