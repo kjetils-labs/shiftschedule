@@ -1,3 +1,4 @@
+// Package path provides a utility function to find a file in the current directory or any of its parent directories.
 package path
 
 import (
@@ -13,7 +14,8 @@ func FindFile(path string) (string, error) {
 
 		_, err := os.Stat(path)
 		if err == nil {
-			abspath, err := filepath.Abs(path)
+			var abspath string
+			abspath, err = filepath.Abs(path)
 			return abspath, err
 		}
 
